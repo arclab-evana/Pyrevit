@@ -1,5 +1,6 @@
 "Section Perpendicular"
 "You should add this plugin onto Quick Access Bar!"
+"Imrpoved and better"
 from pyrevit import revit, DB, forms
 
 doc = revit.doc
