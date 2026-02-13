@@ -1,6 +1,6 @@
 """
-3-Click Section Tool (Succinct Edition)
-Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth
+3-Click Section Tool (Specific Family Edition)
+Features: Custom "Metric Callout" Anchor, Ortho Snapping, Dynamic Depth
 """
 import math
 from pyrevit import revit, DB, forms # Import pyRevit libraries for API access
@@ -16,6 +16,10 @@ DEFAULT_HEIGHT_MM = 3000 # Vertical extent if no level found above
 MIN_SECTION_LENGTH_MM = 50 # Minimum length to prevent zero-length error
 MIN_DEPTH_MM = 50 # Minimum distance for far clip plane
 DEFAULT_DEPTH_MM = 500 # Fallback depth if click is on section line
+
+# TARGET FAMILY SETTINGS
+TARGET_FAMILY_NAME = "ASA DETAIL CALLOUT HEAD"
+TARGET_TYPE_NAME = "Metric Callout"
 
 # --- HELPER FUNCTIONS ---
 
@@ -43,6 +47,26 @@ def get_default_section_type(): # Retrieve valid ViewFamilyType for Section
     vt_collector = DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType) # Reset collector for fallback search
     return next((v for v in vt_collector if v.ViewFamily == DB.ViewFamily.Section), None) # Return first available Section type
 
+def get_breadcrumb_symbol():
+    """
+    Searches specifically for 'ASA DETAIL CALLOUT HEAD' : 'Metric Callout'.
+    Returns the Symbol if found, otherwise None.
+    """
+    # Collect all Family Symbols (Types) in the project
+    collector = DB.FilteredElementCollector(doc).OfClass(DB.FamilySymbol)
+    
+    for symbol in collector:
+        # Check if Family Name matches target
+        if symbol.FamilyName == TARGET_FAMILY_NAME:
+            # Check if Type Name matches target
+            # Note: In API, the 'Name' property of a FamilySymbol is its Type Name.
+            if symbol.Name == TARGET_TYPE_NAME:
+                # Ensure symbol is active/loaded before use
+                if not symbol.IsActive:
+                    symbol.Activate()
+                return symbol
+    return None
+
 def snap_ortho_with_tolerance(p1, p2, tolerance_degrees): # Align p2 orthogonally if within angle tolerance
     vec = p2 - p1 # Vector from start to end point
     length = vec.GetLength() # Magnitude of vector
@@ -62,8 +86,22 @@ def snap_ortho_with_tolerance(p1, p2, tolerance_degrees): # Align p2 orthogonall
         
     return p2 # Return diagonal point if outside tolerance
 
-def create_breadcrumb_visual(doc, center_pt, view): # Create temporary X detail line at point
+def create_breadcrumb_visual(doc, center_pt, view): # Create visual anchor (Family or X)
     ids = [] # List to store created element IDs
+    
+    # --- PRIORITY: TRY TO PLACE FAMILY ---
+    symbol = get_breadcrumb_symbol() # Search for specific Metric Callout
+    
+    if symbol:
+        try:
+            # Create instance of the callout family at the click point
+            instance = doc.Create.NewFamilyInstance(center_pt, symbol, view)
+            ids.append(instance.Id)
+            return ids
+        except Exception:
+            pass # Fall back to lines if placement fails
+    
+    # --- FALLBACK: DRAW DEFAULT 'X' ---
     view_scale = view.Scale # Integer scale of current view
     size_model_mm = BREADCRUMB_PAPER_MM * view_scale # Calculate model size based on scale
     size_ft = mm_to_ft(size_model_mm) / 2.0 # Convert half-size to feet for offsets
@@ -113,7 +151,7 @@ def create_3_click_section(): # Main execution function
         t_crumb = DB.Transaction(doc, "Draw Breadcrumb") # Start sub-transaction for anchor
         t_crumb.Start() # Begin transaction
         
-        crumb_ids = create_breadcrumb_visual(doc, p1, active_view) # Create visual X anchor
+        crumb_ids = create_breadcrumb_visual(doc, p1, active_view) # Create visual anchor
         temp_ids_to_delete.extend(crumb_ids) # Add anchor IDs to delete list
         
         doc.Regenerate() # Force graphics update to show anchor
