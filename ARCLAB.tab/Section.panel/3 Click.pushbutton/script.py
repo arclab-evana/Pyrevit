@@ -1,6 +1,6 @@
 """
-3-Click Section Tool (Succinct Edition)
-Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth
+3-Click Section Tool (Strict <Overhead> Edition)
+Features: Straight Cross Breadcrumb, Dotted Temp Line, Ortho Snapping, Dynamic Depth
 """
 import math
 from pyrevit import revit, DB, forms # Import pyRevit libraries for API access
@@ -16,6 +16,7 @@ DEFAULT_HEIGHT_MM = 3000 # Vertical extent if no level found above
 MIN_SECTION_LENGTH_MM = 50 # Minimum length to prevent zero-length error
 MIN_DEPTH_MM = 50 # Minimum distance for far clip plane
 DEFAULT_DEPTH_MM = 500 # Fallback depth if click is on section line
+TEMP_LINE_STYLE_NAME = "<Overhead>" # Strict name of line style for temporary connector
 
 # --- HELPER FUNCTIONS ---
 
@@ -43,6 +44,13 @@ def get_default_section_type(): # Retrieve valid ViewFamilyType for Section
     vt_collector = DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType) # Reset collector for fallback search
     return next((v for v in vt_collector if v.ViewFamily == DB.ViewFamily.Section), None) # Return first available Section type
 
+def get_linestyle_by_name(doc, name): # Helper to find a GraphicsStyle by exact name
+    collector = DB.FilteredElementCollector(doc).OfClass(DB.GraphicsStyle) # Collect all line styles
+    for gs in collector: # Iterate through styles
+        if gs.Name == name: # strict comparison
+            return gs # Return the matching style element
+    return None # Return None if not found
+
 def snap_ortho_with_tolerance(p1, p2, tolerance_degrees): # Align p2 orthogonally if within angle tolerance
     vec = p2 - p1 # Vector from start to end point
     length = vec.GetLength() # Magnitude of vector
@@ -62,23 +70,24 @@ def snap_ortho_with_tolerance(p1, p2, tolerance_degrees): # Align p2 orthogonall
         
     return p2 # Return diagonal point if outside tolerance
 
-def create_breadcrumb_visual(doc, center_pt, view): # Create temporary X detail line at point
+def create_breadcrumb_visual(doc, center_pt, view): # Create temporary (+) detail line at point
     ids = [] # List to store created element IDs
     view_scale = view.Scale # Integer scale of current view
     size_model_mm = BREADCRUMB_PAPER_MM * view_scale # Calculate model size based on scale
     size_ft = mm_to_ft(size_model_mm) / 2.0 # Convert half-size to feet for offsets
     
-    p1 = center_pt + DB.XYZ(size_ft, size_ft, 0) # Top Right corner
-    p2 = center_pt + DB.XYZ(-size_ft, -size_ft, 0) # Bottom Left corner
-    p3 = center_pt + DB.XYZ(-size_ft, size_ft, 0) # Top Left corner
-    p4 = center_pt + DB.XYZ(size_ft, -size_ft, 0) # Bottom Right corner
+    # Calculate points for a straight Cross (+)
+    p_top = center_pt + DB.XYZ(0, size_ft, 0)
+    p_bottom = center_pt + DB.XYZ(0, -size_ft, 0)
+    p_left = center_pt + DB.XYZ(-size_ft, 0, 0)
+    p_right = center_pt + DB.XYZ(size_ft, 0, 0)
     
     try: # Attempt to create geometry
-        l1 = DB.Line.CreateBound(p1, p2) # Create first crossing line geometry
-        l2 = DB.Line.CreateBound(p3, p4) # Create second crossing line geometry
+        l1 = DB.Line.CreateBound(p_top, p_bottom) # Vertical Line
+        l2 = DB.Line.CreateBound(p_left, p_right) # Horizontal Line
         
-        c1 = doc.Create.NewDetailCurve(view, l1) # Draw first detail line
-        c2 = doc.Create.NewDetailCurve(view, l2) # Draw second detail line
+        c1 = doc.Create.NewDetailCurve(view, l1) # Draw vertical detail line
+        c2 = doc.Create.NewDetailCurve(view, l2) # Draw horizontal detail line
         
         ids.append(c1.Id) # Store ID for cleanup
         ids.append(c2.Id) # Store ID for cleanup
@@ -113,7 +122,7 @@ def create_3_click_section(): # Main execution function
         t_crumb = DB.Transaction(doc, "Draw Breadcrumb") # Start sub-transaction for anchor
         t_crumb.Start() # Begin transaction
         
-        crumb_ids = create_breadcrumb_visual(doc, p1, active_view) # Create visual X anchor
+        crumb_ids = create_breadcrumb_visual(doc, p1, active_view) # Create visual (+) anchor
         temp_ids_to_delete.extend(crumb_ids) # Add anchor IDs to delete list
         
         doc.Regenerate() # Force graphics update to show anchor
@@ -136,6 +145,12 @@ def create_3_click_section(): # Main execution function
         try:
             line_geom = DB.Line.CreateBound(p1, p2) # Create line geometry between points
             temp_crv = doc.Create.NewDetailCurve(active_view, line_geom) # Draw detail line
+            
+            # Strict Style Lookup: Checks ONLY for "<Overhead>"
+            overhead_style = get_linestyle_by_name(doc, TEMP_LINE_STYLE_NAME)
+            if overhead_style:
+                temp_crv.LineStyle = overhead_style # Set the style to look dotted
+                
             temp_ids_to_delete.append(temp_crv.Id) # Add line ID to delete list
             doc.Regenerate() # Force graphics update to show line
         except Exception: # Handle drawing errors
