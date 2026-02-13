@@ -1,167 +1,189 @@
 """
-3-Click Section Tool (Millimeter Edition)
-1. Pick Start Point
-2. Pick End Point (Defines width)
-3. Pick Depth Point (Defines view direction and far clip offset)
-Test new 1
+3-Click Section Tool (Educational Edition)
+Features:
+- "Breadcrumb" Anchor (Dynamic Size based on View Scale)
+- Temp Connector Line
+- Intelligent Ortho Snapping
+- Dynamic Depth
 """
+import math
+# pyrevit imports allow access to the Revit API and UI tools
 from pyrevit import revit, DB, forms
 
+# 'doc' represents the active Revit database (the current project file)
 doc = revit.doc
+# 'uidoc' represents the UI of the active document (selection, clicks, view interactions)
 uidoc = revit.uidoc
 
-# --- USER SETTINGS (IN MILLIMETERS) ---
-# Define your safety limits here in MM
-DEFAULT_HEIGHT_MM = 3000       # Height if no level above is found
-MIN_SECTION_LENGTH_MM = 50     # Minimum length of the section line
-MIN_DEPTH_MM = 50              # Minimum far clip depth (if you click too close to line)
-DEFAULT_DEPTH_MM = 500         # Default depth if calculation fails or is too small
+# --- SETTINGS (USER CONFIGURABLE) ---
+
+# Snapping Tolerance: The angular window (in degrees) where the script forces a straight line.
+# If the angle is within 15 degrees of the X or Y axis, it snaps to that axis.
+ORTHO_TOLERANCE_DEGREES = 15 
+
+# Visual Aid Size: The physical size of the "X" marker in millimeters as it would appear on paper.
+# This ensures the marker is visible regardless of the view scale (1:50 vs 1:500).
+BREADCRUMB_PAPER_MM = 4.0      
+
+# Default Height: The vertical extent of the section if no level is found above the current one.
+DEFAULT_HEIGHT_MM = 3000       
+# Minimum Length: Prevents creating zero-length sections if the user double-clicks.
+MIN_SECTION_LENGTH_MM = 50     
+# Minimum Depth: Prevents the Far Clip Plane from being set too close to the section line.
+MIN_DEPTH_MM = 50              
+# Default Depth: The fallback depth used if the user clicks directly on the section line.
+DEFAULT_DEPTH_MM = 500         
 
 # --- HELPER FUNCTIONS ---
 
 def mm_to_ft(mm):
-    """Converts millimeters to internal Revit feet."""
+    """
+    Converts a value from Millimeters to Decimal Feet.
+    Revit's internal database ALWAYS uses decimal feet, regardless of project unit settings.
+    """
+    # UnitUtils.ConvertToInternalUnits: The standard API method for unit conversion.
+    # UnitTypeId.Millimeters: The strict identifier for millimeter units in newer Revit versions.
     return DB.UnitUtils.ConvertToInternalUnits(mm, DB.UnitTypeId.Millimeters)
 
 def get_upper_level(current_level):
-    """Finds the level immediately above the current level to determine height."""
+    """
+    Scans the project to find the Level element immediately above the provided level.
+    Used to automatically set the top constraint of the section box.
+    """
+    # FilteredElementCollector: Search engine for the Revit database.
+    # OfClass(DB.Level): Restricts search to objects of type 'Level'.
+    # ToElements(): Executes the search and returns a Python list of Level objects.
     all_levels = DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
+    
+    # Sorts the list of levels based on their 'Elevation' property (height from zero).
     sorted_levels = sorted(all_levels, key=lambda l: l.Elevation)
     
+    # Iterate through the sorted list to find the current level's index.
     for i, level in enumerate(sorted_levels):
         if level.Id == current_level.Id:
+            # Check if there is a next level in the list (index + 1).
             if i + 1 < len(sorted_levels):
+                # Return the level object found at the next index.
                 return sorted_levels[i+1]
     return None
 
 def get_default_section_type():
-    """Finds a valid ViewSection ViewFamilyType."""
+    """
+    Retrieves a ViewFamilyType to be used for the new Section.
+    Prioritizes a type named 'AL_Section', otherwise grabs the first available Section type.
+    """
+    # Collector for all ViewFamilyTypes (Floor Plans, Sections, Elevations, etc.)
     vt_collector = DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType)
     
-    # 1. Look for AL_Section
+    # Target Name: The specific View Type name we prefer to use.
     target_name = "AL_Section"
+    
+    # Iterate to find the specific match.
     for v in vt_collector:
+        # Check if family is 'Section' AND name matches target.
         if v.ViewFamily == DB.ViewFamily.Section and v.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString() == target_name:
             return v
             
-    # 2. Fallback: Return the first available Section type
+    # Fallback: Reset the collector (since generators are consumed after iteration).
     vt_collector = DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType)
+    # Return the first type where the ViewFamily is 'Section'.
     return next((v for v in vt_collector if v.ViewFamily == DB.ViewFamily.Section), None)
+
+def snap_ortho_with_tolerance(p1, p2, tolerance_degrees):
+    """
+    Adjusts point p2 to align horizontally or vertically with p1 if the angle is close to 90 degrees.
+    Uses vector math to determine if the line is 'mostly horizontal' or 'mostly vertical'.
+    """
+    # Vector Subtraction: Creates a directional vector from Start(p1) to End(p2).
+    vec = p2 - p1
+    # GetLength: Calculates the magnitude (distance) of the vector.
+    length = vec.GetLength()
+    
+    # Safety Check: If points are effectively identical, return p2 to avoid division by zero.
+    if length < 0.001: 
+        return p2
+
+    # Threshold Calculation: Converts degrees to a cosine value (0.0 to 1.0).
+    # 1.0 = 0 degrees (perfect alignment), 0.0 = 90 degrees (perpendicular).
+    threshold = math.cos(math.radians(tolerance_degrees))
+    
+    # Normalization: Calculates the ratio of the vector in X and Y directions.
+    # norm_x: How "Horizontal" is the line? (1.0 = Horizontal).
+    norm_x = abs(vec.X / length)
+    # norm_y: How "Vertical" is the line? (1.0 = Vertical).
+    norm_y = abs(vec.Y / length)
+    
+    # If the X component is greater than the threshold, snap Y to match p1 (Horizontal Line).
+    if norm_x > threshold:
+        return DB.XYZ(p2.X, p1.Y, p2.Z) 
+    # If the Y component is greater than the threshold, snap X to match p1 (Vertical Line).
+    elif norm_y > threshold:
+        return DB.XYZ(p1.X, p2.Y, p2.Z) 
+    
+    # If neither, the user drew a diagonal line intentionally. Return original point.
+    return p2
+
+def create_breadcrumb_visual(doc, center_pt, view):
+    """
+    Creates a temporary Detail Line "X" (Crosshair) at a specific point.
+    Used to visually anchor the user's eye between clicks.
+    """
+    ids = []
+    
+    # View.Scale: Returns the integer scale of the view (e.g., 100 for 1:100).
+    view_scale = view.Scale
+    
+    # Calculation: Multiplies paper mm by scale to get model mm size.
+    size_model_mm = BREADCRUMB_PAPER_MM * view_scale
+    
+    # Convert the calculated model size to feet (Revit's internal unit).
+    size_ft = mm_to_ft(size_model_mm) / 2.0
+    
+    # Define 4 corner points relative to the center point to create an X shape.
+    p1 = center_pt + DB.XYZ(size_ft, size_ft, 0)   # Top Right
+    p2 = center_pt + DB.XYZ(-size_ft, -size_ft, 0) # Bottom Left
+    p3 = center_pt + DB.XYZ(-size_ft, size_ft, 0)  # Top Left
+    p4 = center_pt + DB.XYZ(size_ft, -size_ft, 0)  # Bottom Right
+    
+    try:
+        # CreateBound: Creates a Line geometry object (abstract math, not a Revit element yet).
+        l1 = DB.Line.CreateBound(p1, p2)
+        l2 = DB.Line.CreateBound(p3, p4)
+        
+        # NewDetailCurve: Creates the actual Detail Line element in the specific view.
+        c1 = doc.Create.NewDetailCurve(view, l1)
+        c2 = doc.Create.NewDetailCurve(view, l2)
+        
+        # Collect the Element IDs so we can delete them later.
+        ids.append(c1.Id)
+        ids.append(c2.Id)
+    except Exception:
+        pass 
+        
+    return ids
 
 # --- CORE LOGIC ---
 
 def create_3_click_section():
-    # 1. Validation: Ensure we are in a Plan View
+    # ActiveView: The view currently open on the user's screen.
     active_view = doc.ActiveView
+    
+    # Validation: Checks if the ViewType is Plan or Ceiling (cannot make sections in 3D views).
     if active_view.ViewType not in [DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan]:
         forms.alert("Please run this tool from a Floor or Ceiling Plan.", exitscript=True)
     
+    # GenLevel: The 'associated level' property of the current view.
     curr_level = active_view.GenLevel
     if not curr_level:
         forms.alert("Current view does not have an associated level.", exitscript=True)
 
-    # 2. User Inputs (The 3 Clicks)
-    try:
-        pt_start = uidoc.Selection.PickPoint("Click 1: Start of Section Line")
-        pt_end = uidoc.Selection.PickPoint("Click 2: End of Section Line")
-        pt_depth = uidoc.Selection.PickPoint("Click 3: Define Section Depth/Direction")
-    except Exception:
-        return # User cancelled
-
-    # 3. Vector Math setup
-    # Project points to Z=0 to ensure planar math
-    p1 = DB.XYZ(pt_start.X, pt_start.Y, 0)
-    p2 = DB.XYZ(pt_end.X, pt_end.Y, 0)
-    p3 = DB.XYZ(pt_depth.X, pt_depth.Y, 0)
-
-    # Vector representing the section line
-    vec_line = p2 - p1
-    section_length_ft = vec_line.GetLength()
-    
-    # EXPLANATION: Length Check in MM
-    # We convert our Minimum MM constant to Feet to compare with Revit's internal length
-    if section_length_ft < mm_to_ft(MIN_SECTION_LENGTH_MM):
-        forms.alert("Section line is too short (<{}mm).".format(MIN_SECTION_LENGTH_MM), exitscript=True)
-
-    # Calculate Midpoint (Origin of the Section)
-    midpoint = p1 + (vec_line / 2.0)
-
-    # 4. Determine View Direction
-    # Cross product of Line (X,Y,0) and BasisZ (0,0,1) gives a perpendicular vector
-    ortho_dir = vec_line.CrossProduct(DB.XYZ.BasisZ).Normalize()
-    vec_to_depth = p3 - p1
-    
-    # Dot product check to flip direction if needed
-    if ortho_dir.DotProduct(vec_to_depth) < 0:
-        view_dir = -ortho_dir
-    else:
-        view_dir = ortho_dir
-
-    # 5. Calculate Depth (Far Clip Offset)
-    # Project vec_to_depth onto the view_dir
-    depth_dist_ft = abs(view_dir.DotProduct(vec_to_depth))
-    
-    # EXPLANATION: Depth Safety in MM
-    # If the user clicks closer than MIN_DEPTH_MM (e.g., 50mm), 
-    # we enforce a default depth (e.g. 500mm) instead of creating a flat view.
-    min_depth_ft = mm_to_ft(MIN_DEPTH_MM)
-    
-    if depth_dist_ft < min_depth_ft: 
-        depth_dist_ft = mm_to_ft(DEFAULT_DEPTH_MM)
-
-    # 6. Calculate Height
-    upper_level = get_upper_level(curr_level)
-    if upper_level:
-        height_ft = upper_level.Elevation - curr_level.Elevation
-    else:
-        height_ft = mm_to_ft(DEFAULT_HEIGHT_MM)
-
-    # 7. Construct the BoundingBox (All units are now confirmed Feet derived from MM logic)
-    bbox = DB.BoundingBoxXYZ()
-    bbox.Min = DB.XYZ(-section_length_ft / 2.0, 0, 0)
-    bbox.Max = DB.XYZ(section_length_ft / 2.0, height_ft, depth_dist_ft)
-
-    # 8. Define Orientation Transform
-    t = DB.Transform.Identity
-    t.Origin = midpoint
-    t.BasisZ = view_dir
-    t.BasisY = DB.XYZ.BasisZ
-    t.BasisX = t.BasisY.CrossProduct(t.BasisZ)
-    bbox.Transform = t
-
-    # 9. Create the View (Transactional)
-    section_type = get_default_section_type()
-    if not section_type:
-        forms.alert("No suitable Section View Type found.", exitscript=True)
-
-    # Transaction Group for clean Rollback
+    # TransactionGroup: A wrapper that groups multiple transactions into a single "Undo" item.
     tg = DB.TransactionGroup(doc, "Create 3-Click Section")
     tg.Start()
 
+    # List initialization to store IDs of temporary visual aids for cleanup.
+    temp_ids_to_delete = []
+
     try:
-        t_inner = DB.Transaction(doc, "Create View")
-        t_inner.Start()
-        
-        # Create Section
-        new_section = DB.ViewSection.CreateSection(doc, section_type.Id, bbox)
-        
-        # Apply visual settings
-        new_section.CropBoxActive = True
-        new_section.CropBoxVisible = False
-        
-        # Set Far Clip
-        new_section.get_Parameter(DB.BuiltInParameter.VIEWER_BOUND_FAR_CLIPPING).Set(1) 
-        new_section.get_Parameter(DB.BuiltInParameter.VIEWER_BOUND_OFFSET_FAR).Set(depth_dist_ft)
-
-        t_inner.Commit()
-        tg.Assimilate()
-
-    except Exception as e:
-        if 't_inner' in locals() and t_inner.GetStatus() == DB.TransactionStatus.Started:
-            t_inner.RollBack()
-        tg.RollBack()
-        forms.alert("Transaction Failed. Changes rolled back.\nError: {}".format(e))
-
-# --- EXECUTION ---
-if __name__ == "__main__":
-    create_3_click_section()
+        # --- CLICK 1: START POINT ---
+        # PickPoint: Pauses script
