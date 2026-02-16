@@ -54,14 +54,14 @@ class ViewRangeUpdateHandler(IExternalEventHandler):
                 for plane in [DB.PlanViewPlane.TopClipPlane, 
                              DB.PlanViewPlane.CutPlane, 
                              DB.PlanViewPlane.BottomClipPlane, 
-                             DB.PlanViewPlane.ViewDepth]:
+                             DB.PlanViewPlane.ViewDepthPlane]:
                     vr.SetLevelId(plane, assoc_level_id)
 
                 # 2. Apply Offsets (Logic: Top > Cut > Bottom >= Depth)
                 vr.SetOffset(DB.PlanViewPlane.TopClipPlane, offset_in_feet + buffer)
                 vr.SetOffset(DB.PlanViewPlane.CutPlane, offset_in_feet)
                 vr.SetOffset(DB.PlanViewPlane.BottomClipPlane, offset_in_feet - buffer)
-                vr.SetOffset(DB.PlanViewPlane.ViewDepth, offset_in_feet - buffer)
+                vr.SetOffset(DB.PlanViewPlane.ViewDepthPlane, offset_in_feet - buffer)
                 
                 view.SetViewRange(vr)
                 t.Commit() 
