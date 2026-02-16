@@ -1,66 +1,79 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Burger Range" Height="450" Width="220" 
+        Title="Burger Range" Height="480" Width="220" 
         Topmost="True" WindowStartupLocation="CenterScreen" 
         ResizeMode="NoResize" Background="#F5F5F5">
 
     <Grid Margin="10">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="70"/> <ColumnDefinition Width="*"/>  </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <RowDefinition Height="*"/>    </Grid.RowDefinitions>
 
-        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-            <TextBlock Name="TopLabel" Text="Top: +600" Foreground="#E04F5F" Margin="0,0,0,30" FontWeight="Bold" FontSize="10"/>
-            <TextBlock Name="CutLabel" Text="Cut: 1200" Foreground="#0078D7" Margin="0,0,0,30" FontWeight="Bold" FontSize="12"/>
-            <TextBlock Name="BotLabel" Text="Bot: -600" Foreground="#E04F5F" FontWeight="Bold" FontSize="10"/>
-        </StackPanel>
-
-        <Border Grid.Column="1" BorderBrush="#DDD" BorderThickness="1" Background="#FFF" CornerRadius="4">
-            <Canvas Name="SliderCanvas" Width="100" Height="350" ClipToBounds="True">
-                
-                <Rectangle Canvas.Left="50" Width="1" Height="800" Fill="#EEE"/>
-
-                <Thumb Name="TopThumb" Height="20" Width="30" Canvas.Left="55" Canvas.Top="50">
-                    <Thumb.Template>
-                        <ControlTemplate>
-                            <Grid>
-                                <Path Data="M 20,0 L 0,10 L 20,20 Z" Fill="#E04F5F"/>
-                            </Grid>
-                        </ControlTemplate>
-                    </Thumb.Template>
-                </Thumb>
-
-                <Thumb Name="CutThumb" Height="30" Width="90" Canvas.Left="5" Canvas.Top="150">
-                    <Thumb.Template>
-                        <ControlTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/> <ColumnDefinition Width="30"/> </Grid.ColumnDefinitions>
-
-                                <Rectangle Grid.Column="0" Height="2" Fill="#0078D7" VerticalAlignment="Center"/>
-                                
-                                <Border Grid.Column="1" Background="#0078D7" CornerRadius="4" BorderBrush="#005A9E" BorderThickness="1">
-                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                        <Rectangle Height="2" Width="20" Fill="#80FFFFFF" Margin="0,1"/>
-                                        <Rectangle Height="2" Width="20" Fill="#80FFFFFF" Margin="0,1"/>
-                                        <Rectangle Height="2" Width="20" Fill="#80FFFFFF" Margin="0,1"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </ControlTemplate>
-                    </Thumb.Template>
-                </Thumb>
-
-                <Thumb Name="BotThumb" Height="20" Width="30" Canvas.Left="15" Canvas.Top="250">
-                    <Thumb.Template>
-                        <ControlTemplate>
-                            <Grid>
-                                <Path Data="M 0,0 L 20,10 L 0,20 Z" Fill="#E04F5F"/>
-                            </Grid>
-                        </ControlTemplate>
-                    </Thumb.Template>
-                </Thumb>
-
-            </Canvas>
+        <Border Grid.Row="0" BorderBrush="#EEE" BorderThickness="0,0,0,1" Margin="0,0,0,10" Padding="0,0,0,5">
+            <TextBlock Name="ViewNameLabel" Text="FLOOR PLAN LEVEL 1" 
+                       FontWeight="Bold" Foreground="#333" 
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
         </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="60"/> <ColumnDefinition Width="*"/>  </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0">
+                <TextBlock Name="TopLabel" Text="+600" Foreground="#E04F5F" Margin="0,0,0,30" FontWeight="Bold" FontSize="11"/>
+                <TextBlock Name="CutLabel" Text="1200" Foreground="#0078D7" Margin="0,0,0,30" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Name="BotLabel" Text="-600" Foreground="#E04F5F" FontWeight="Bold" FontSize="11"/>
+            </StackPanel>
+
+            <Border Grid.Column="1" BorderBrush="#DDD" BorderThickness="1" Background="#FFF" CornerRadius="4">
+                <Canvas Name="SliderCanvas" Width="100" Height="350" ClipToBounds="True">
+                    
+                    <Rectangle Canvas.Left="49" Width="2" Height="800" Fill="#EEE"/>
+
+                    <Thumb Name="TopThumb" Height="20" Width="30" Canvas.Left="35" Canvas.Top="50">
+                        <Thumb.Template>
+                            <ControlTemplate>
+                                <Grid>
+                                    <Path Data="M 0,15 L 15,0 L 30,15 Z" Fill="#E04F5F"/>
+                                </Grid>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+
+                    <Thumb Name="CutThumb" Height="24" Width="46" Canvas.Left="27" Canvas.Top="150">
+                        <Thumb.Template>
+                            <ControlTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/> 
+                                        <ColumnDefinition Width="26"/> 
+                                    </Grid.ColumnDefinitions>
+
+                                    <Rectangle Grid.Column="0" Height="2" Fill="#0078D7" VerticalAlignment="Center"/>
+                                    
+                                    <Border Grid.Column="1" Background="#0078D7" CornerRadius="3" BorderBrush="#005A9E" BorderThickness="1">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <Rectangle Height="1" Width="14" Fill="#90FFFFFF" Margin="0,1"/>
+                                            <Rectangle Height="1" Width="14" Fill="#90FFFFFF" Margin="0,1"/>
+                                            <Rectangle Height="1" Width="14" Fill="#90FFFFFF" Margin="0,1"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+
+                    <Thumb Name="BotThumb" Height="20" Width="30" Canvas.Left="35" Canvas.Top="250">
+                        <Thumb.Template>
+                            <ControlTemplate>
+                                <Grid>
+                                    <Path Data="M 0,0 L 15,15 L 30,0 Z" Fill="#E04F5F"/>
+                                </Grid>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+
+                </Canvas>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
