@@ -157,18 +157,18 @@ class BurgerWindow(forms.WPFWindow):
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
-                # --- FIX: Adjusted Widths to prevent clipping ---
-                # Canvas Width = 80
-                # Line Width = 70 (Centered with 5px margin)
-                # Label Width = 70 (Centered with 5px margin)
+                # --- FIX: Reduced Widths to prevent clipping ---
+                # Canvas Width in XAML is now 72. 
+                # We use 60 width. 60 + 5 (margin) = 65.
+                # This leaves ~7px buffer on the right side.
                 
                 line = Rectangle()
-                line.Width = 70.0 
+                line.Width = 60.0 
                 line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
                 line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
-                Canvas.SetLeft(line, 5.0) # 5px Left Margin
+                Canvas.SetLeft(line, 5.0) 
                 Canvas.SetTop(line, y_pos)
                 
                 label = TextBlock()
@@ -176,9 +176,9 @@ class BurgerWindow(forms.WPFWindow):
                 label.FontSize = 8.0 
                 label.Foreground = SolidColorBrush(Colors.Gray)
                 label.TextAlignment = TextAlignment.Right
-                label.Width = 70.0
+                label.Width = 60.0 # Matches line width exactly
                 
-                Canvas.SetLeft(label, 5.0) # 5px Left Margin matches line
+                Canvas.SetLeft(label, 5.0) 
                 Canvas.SetTop(label, y_pos - 11.0)
                 
                 self.SliderCanvas.Children.Insert(0, line)

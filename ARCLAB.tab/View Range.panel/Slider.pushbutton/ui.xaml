@@ -18,20 +18,22 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="40"/> <ColumnDefinition Width="*"/>  </Grid.ColumnDefinitions>
+                <ColumnDefinition Width="48"/> 
+                <ColumnDefinition Width="*"/>  
+            </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="5,0,2,0">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="6,0,2,0">
                 <TextBlock Name="TopLabel" Text="+600" Foreground="Black" Margin="0,0,0,30" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
                 <TextBlock Name="CutLabel" Text="1200" Foreground="Black" Margin="0,0,0,30" FontWeight="Bold" FontSize="14" HorizontalAlignment="Right"/>
                 <TextBlock Name="BotLabel" Text="-600" Foreground="Black" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
             </StackPanel>
 
             <Border Grid.Column="1" BorderBrush="Black" BorderThickness="1" Background="White" CornerRadius="2">
-                <Canvas Name="SliderCanvas" Width="80" Height="350" ClipToBounds="True">
+                <Canvas Name="SliderCanvas" Width="72" Height="350" ClipToBounds="True">
                     
-                    <Rectangle Canvas.Left="39" Width="2" Height="800" Fill="#EEE"/>
+                    <Rectangle Canvas.Left="35" Width="2" Height="800" Fill="#EEE"/>
 
-                    <Thumb Name="CutThumb" Height="14" Width="18" Canvas.Left="55" Canvas.Top="150">
+                    <Thumb Name="CutThumb" Height="14" Width="18" Canvas.Left="50" Canvas.Top="150">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
@@ -48,7 +50,7 @@
                         </Thumb.Template>
                     </Thumb>
 
-                    <Thumb Name="TopThumb" Height="15" Width="30" Canvas.Left="25" Canvas.Top="50">
+                    <Thumb Name="TopThumb" Height="15" Width="30" Canvas.Left="21" Canvas.Top="50">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
@@ -58,7 +60,7 @@
                         </Thumb.Template>
                     </Thumb>
 
-                    <Thumb Name="BotThumb" Height="15" Width="30" Canvas.Left="25" Canvas.Top="250">
+                    <Thumb Name="BotThumb" Height="15" Width="30" Canvas.Left="21" Canvas.Top="250">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
