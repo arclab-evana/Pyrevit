@@ -6,7 +6,9 @@
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <RowDefinition Height="*"/>    </Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
         <Border Grid.Row="0" BorderBrush="#CCC" BorderThickness="0,0,0,1" Margin="0,0,0,10" Padding="0,0,0,5">
             <TextBlock Name="ViewNameLabel" Text="FLOOR PLAN" 
@@ -16,7 +18,9 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="60"/> <ColumnDefinition Width="*"/>  </Grid.ColumnDefinitions>
+                <ColumnDefinition Width="60"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0">
                 <TextBlock Name="TopLabel" Text="+600" Foreground="Black" Margin="0,0,0,30" FontWeight="Bold" FontSize="11"/>
@@ -29,33 +33,29 @@
                     
                     <Rectangle Canvas.Left="49" Width="2" Height="800" Fill="#EEE"/>
 
-                    <Thumb Name="TopThumb" Height="20" Width="30" Canvas.Left="35" Canvas.Top="50">
+                    <Thumb Name="CutThumb" Height="16" Width="20" Canvas.Left="52" Canvas.Top="150">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
-                                    <Path Data="M 0,15 L 15,0 L 30,15 Z" Fill="Black"/>
+                                    <Rectangle Height="2" Width="10" Fill="Black" HorizontalAlignment="Left" Margin="-6,0,0,0"/>
+                                    
+                                    <Border Background="Black" CornerRadius="2" Width="16" HorizontalAlignment="Right">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <Rectangle Height="1" Width="8" Fill="White" Margin="0,1"/>
+                                            <Rectangle Height="1" Width="8" Fill="White" Margin="0,1"/>
+                                            <Rectangle Height="1" Width="8" Fill="White" Margin="0,1"/>
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
                             </ControlTemplate>
                         </Thumb.Template>
                     </Thumb>
 
-                    <Thumb Name="CutThumb" Height="24" Width="30" Canvas.Left="35" Canvas.Top="150">
+                    <Thumb Name="TopThumb" Height="20" Width="30" Canvas.Left="35" Canvas.Top="50">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/> 
-                                        <ColumnDefinition Width="18"/> </Grid.ColumnDefinitions>
-
-                                    <Rectangle Grid.Column="0" Height="2" Fill="Black" VerticalAlignment="Center" Margin="-20,0,0,0"/>
-                                    
-                                    <Border Grid.Column="1" Background="Black" CornerRadius="2">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Rectangle Height="1" Width="10" Fill="White" Margin="0,1"/>
-                                            <Rectangle Height="1" Width="10" Fill="White" Margin="0,1"/>
-                                            <Rectangle Height="1" Width="10" Fill="White" Margin="0,1"/>
-                                        </StackPanel>
-                                    </Border>
+                                    <Path Data="M 0,15 L 15,0 L 30,15 Z" Fill="Black"/>
                                 </Grid>
                             </ControlTemplate>
                         </Thumb.Template>

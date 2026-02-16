@@ -87,12 +87,13 @@ class BurgerWindow(forms.WPFWindow):
         self.bot_thick = 600.0     
 
         # --- SETUP ---
-        if revit.active_view.Name:
-            self.ViewNameLabel.Text = revit.active_view.Name.upper()
-            
+        self.check_active_view(None, None) 
         self.draw_level_references() 
         
-        # Events
+        # Events: Mouse Move checks for view changes (Modeless Trick)
+        self.MouseMove += self.check_active_view
+
+        # Drag Events
         self.CutThumb.DragDelta += self.on_cut_drag
         self.TopThumb.DragDelta += self.on_top_drag
         self.BotThumb.DragDelta += self.on_bot_drag
@@ -103,6 +104,17 @@ class BurgerWindow(forms.WPFWindow):
 
         self.update_visuals()
 
+    # --- VIEW CHECKER ---
+    def check_active_view(self, sender, args):
+        """Updates the label if the user switches views."""
+        try:
+            v = revit.active_view
+            if v:
+                self.ViewNameLabel.Text = v.Name.upper()
+        except:
+            pass
+
+    # --- MATH HELPERS ---
     def mm_to_px(self, mm_val):
         total_span = self.MAX_RANGE_MM - self.MIN_RANGE_MM
         if total_span == 0: return 0
@@ -118,7 +130,6 @@ class BurgerWindow(forms.WPFWindow):
     
     # --- LEVEL REFERENCE LOGIC ---
     def draw_level_references(self):
-        """Finds levels and draws dashed lines on the canvas."""
         doc = revit.doc
         view = revit.active_view
         
@@ -128,26 +139,19 @@ class BurgerWindow(forms.WPFWindow):
         current_level = view.GenLevel
         current_elev = current_level.Elevation
         
-        # 1. Find relevant levels
         levels = FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
         levels = sorted(levels, key=lambda x: x.Elevation)
         
-        # Determine offsets in MM
         ref_levels = []
-        
-        # Always add Current Level (Offset 0)
         ref_levels.append(("LEVEL 0", 0.0))
         
-        # Find Next Above and Next Below
         for i, lvl in enumerate(levels):
             if lvl.Id == current_level.Id:
-                # Level Below
                 if i > 0:
                     below = levels[i-1]
                     delta = below.Elevation - current_elev
                     mm = UnitUtils.ConvertFromInternalUnits(delta, UnitTypeId.Millimeters)
                     ref_levels.append((below.Name.upper(), mm))
-                # Level Above
                 if i < len(levels) - 1:
                     above = levels[i+1]
                     delta = above.Elevation - current_elev
@@ -155,26 +159,20 @@ class BurgerWindow(forms.WPFWindow):
                     ref_levels.append((above.Name.upper(), mm))
                 break
         
-        # 2. Draw them on Canvas
         for name, mm in ref_levels:
-            # Check if visible in our scale
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
-                # A. The Line
                 line = Rectangle()
-                line.Width = 100.0 # Explicit double
-                line.Height = 1.0  # Explicit double
+                line.Width = 100.0
+                line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
+                # Fixed float casting for IronPython
+                line.StrokeDashArray = DoubleCollection([4.0, 2.0]) 
                 
-                # --- FIX IS HERE: Must use floats (4.0, 2.0) not ints ---
-                line.StrokeDashArray = DoubleCollection([4.0, 2.0])
-                
-                # Position
                 Canvas.SetLeft(line, 0.0)
                 Canvas.SetTop(line, y_pos)
                 
-                # B. The Label
                 label = TextBlock()
                 label.Text = name
                 label.FontSize = 9.0
@@ -182,11 +180,9 @@ class BurgerWindow(forms.WPFWindow):
                 label.TextAlignment = TextAlignment.Right
                 label.Width = 90.0
                 
-                # Position (Just above line)
                 Canvas.SetLeft(label, 0.0)
                 Canvas.SetTop(label, y_pos - 12.0)
                 
-                # Add to Canvas (Insert at index 0 to put behind thumbs)
                 self.SliderCanvas.Children.Insert(0, line)
                 self.SliderCanvas.Children.Insert(0, label)
 
@@ -197,20 +193,22 @@ class BurgerWindow(forms.WPFWindow):
         self.update_visuals()
 
     def on_top_drag(self, sender, e):
-        current_top_abs = self.cut_mm + self.top_thick
-        current_px = self.mm_to_px(current_top_abs)
-        new_px = current_px + e.VerticalChange
-        new_abs = self.px_to_mm(new_px)
+        # Anchor Logic: Mouse drags the TIP (Bottom) of the arrow
+        tip_px = self.mm_to_px(self.cut_mm + self.top_thick)
+        new_tip_px = tip_px + e.VerticalChange
+        new_abs = self.px_to_mm(new_tip_px)
+        
         new_thick = new_abs - self.cut_mm
         if new_thick < self.MIN_THICKNESS: new_thick = self.MIN_THICKNESS
         self.top_thick = new_thick
         self.update_visuals()
 
     def on_bot_drag(self, sender, e):
-        current_bot_abs = self.cut_mm - self.bot_thick
-        current_px = self.mm_to_px(current_bot_abs)
-        new_px = current_px + e.VerticalChange
-        new_abs = self.px_to_mm(new_px)
+        # Anchor Logic: Mouse drags the TIP (Top) of the arrow
+        tip_px = self.mm_to_px(self.cut_mm - self.bot_thick)
+        new_tip_px = tip_px + e.VerticalChange
+        new_abs = self.px_to_mm(new_tip_px)
+        
         new_thick = self.cut_mm - new_abs
         if new_thick < self.MIN_THICKNESS: new_thick = self.MIN_THICKNESS
         self.bot_thick = new_thick
@@ -224,13 +222,22 @@ class BurgerWindow(forms.WPFWindow):
         self.CutLabel.Text = "{}".format(int(self.cut_mm))
         self.BotLabel.Text = "-{}".format(int(self.bot_thick))
 
-        self.move_thumb(self.TopThumb, top_abs)
-        self.move_thumb(self.CutThumb, self.cut_mm)
-        self.move_thumb(self.BotThumb, bot_abs)
+        # Anchor Logic:
+        # Top Thumb: Tip is at the Bottom of the image -> anchor="bottom"
+        # Bot Thumb: Tip is at the Top of the image -> anchor="top"
+        self.move_thumb(self.TopThumb, top_abs, anchor="bottom")
+        self.move_thumb(self.CutThumb, self.cut_mm, anchor="center")
+        self.move_thumb(self.BotThumb, bot_abs, anchor="top")
 
-    def move_thumb(self, thumb, mm_val):
+    def move_thumb(self, thumb, mm_val, anchor="center"):
         y_pos = self.mm_to_px(mm_val)
-        thumb.SetValue(Canvas.TopProperty, y_pos - (thumb.Height / 2.0))
+        
+        if anchor == "center":
+            thumb.SetValue(Canvas.TopProperty, y_pos - (thumb.Height / 2.0))
+        elif anchor == "bottom":
+            thumb.SetValue(Canvas.TopProperty, y_pos - thumb.Height)
+        elif anchor == "top":
+            thumb.SetValue(Canvas.TopProperty, y_pos)
 
     def trigger_revit(self, sender, e):
         self.handler.cut_mm = self.cut_mm
