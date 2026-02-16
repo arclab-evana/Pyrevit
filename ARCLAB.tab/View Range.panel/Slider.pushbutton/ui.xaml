@@ -16,8 +16,7 @@
                     Minimum="-1000" 
                     Maximum="5000" 
                     TickFrequency="100" 
-                    IsSnapToTickEnabled="False"
-                    ValueChanged="on_slider_change"/>
+                    IsSnapToTickEnabled="False"/>
             
             <TextBlock Name="ValueDisplay" 
                        Text="1200 mm" 
