@@ -99,6 +99,9 @@ class BurgerWindow(forms.WPFWindow):
         self.CutThumb.DragCompleted += self.trigger_revit
         self.TopThumb.DragCompleted += self.trigger_revit
         self.BotThumb.DragCompleted += self.trigger_revit
+        
+        # New Reset Button Event
+        self.ResetButton.Click += self.reset_defaults
 
         self.update_visuals()
 
@@ -109,6 +112,11 @@ class BurgerWindow(forms.WPFWindow):
                 self.ViewNameLabel.Text = v.Name.upper()
         except:
             pass
+
+    # --- MATH HELPERS ---
+    def snap_to_5(self, val):
+        """Rounds value to nearest 5"""
+        return round(val / 5.0) * 5.0
 
     def mm_to_px(self, mm_val):
         total_span = self.MAX_RANGE_MM - self.MIN_RANGE_MM
@@ -157,11 +165,6 @@ class BurgerWindow(forms.WPFWindow):
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
-                # --- FIX: Reduced Widths to prevent clipping ---
-                # Canvas Width in XAML is now 72. 
-                # We use 60 width. 60 + 5 (margin) = 65.
-                # This leaves ~7px buffer on the right side.
-                
                 line = Rectangle()
                 line.Width = 60.0 
                 line.Height = 1.0
@@ -176,7 +179,7 @@ class BurgerWindow(forms.WPFWindow):
                 label.FontSize = 8.0 
                 label.Foreground = SolidColorBrush(Colors.Gray)
                 label.TextAlignment = TextAlignment.Right
-                label.Width = 60.0 # Matches line width exactly
+                label.Width = 60.0 
                 
                 Canvas.SetLeft(label, 5.0) 
                 Canvas.SetTop(label, y_pos - 11.0)
@@ -184,9 +187,11 @@ class BurgerWindow(forms.WPFWindow):
                 self.SliderCanvas.Children.Insert(0, line)
                 self.SliderCanvas.Children.Insert(0, label)
 
+    # --- DRAG HANDLERS (With Snapping) ---
     def on_cut_drag(self, sender, e):
         delta_mm = -1 * (e.VerticalChange / self.CANVAS_HEIGHT) * (self.MAX_RANGE_MM - self.MIN_RANGE_MM)
-        self.cut_mm += delta_mm
+        # Apply Snap
+        self.cut_mm = self.snap_to_5(self.cut_mm + delta_mm)
         self.update_visuals()
 
     def on_top_drag(self, sender, e):
@@ -194,7 +199,10 @@ class BurgerWindow(forms.WPFWindow):
         new_tip_px = tip_px + e.VerticalChange
         new_abs = self.px_to_mm(new_tip_px)
         
-        new_thick = new_abs - self.cut_mm
+        # Calculate raw thickness then snap
+        raw_thick = new_abs - self.cut_mm
+        new_thick = self.snap_to_5(raw_thick)
+
         if new_thick < self.MIN_THICKNESS: new_thick = self.MIN_THICKNESS
         self.top_thick = new_thick
         self.update_visuals()
@@ -204,10 +212,21 @@ class BurgerWindow(forms.WPFWindow):
         new_tip_px = tip_px + e.VerticalChange
         new_abs = self.px_to_mm(new_tip_px)
         
-        new_thick = self.cut_mm - new_abs
+        raw_thick = self.cut_mm - new_abs
+        new_thick = self.snap_to_5(raw_thick)
+        
         if new_thick < self.MIN_THICKNESS: new_thick = self.MIN_THICKNESS
         self.bot_thick = new_thick
         self.update_visuals()
+
+    # --- RESET HANDLER ---
+    def reset_defaults(self, sender, args):
+        self.cut_mm = 1500.0
+        self.top_thick = 100.0
+        self.bot_thick = 100.0
+        
+        self.update_visuals()
+        self.trigger_revit(None, None)
 
     def update_visuals(self):
         top_abs = self.cut_mm + self.top_thick
