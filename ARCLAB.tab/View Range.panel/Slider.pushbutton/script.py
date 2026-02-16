@@ -1,65 +1,82 @@
 # -*- coding: utf-8 -*-
 from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
-from Autodesk.Revit.Exceptions import InvalidOperationException
+from Autodesk.Revit.DB import UnitUtils, UnitTypeId
 
-# 1. THE HANDLER: This is the "Worker" that actually changes Revit
+# 1. THE WORKER: This class executes the Revit commands
 class ViewRangeUpdateHandler(IExternalEventHandler):
     def __init__(self):
-        self.new_offset = 0.0
+        self.new_offset_mm = 0.0
 
     def Execute(self, uiapp):
         doc = uiapp.ActiveUIDocument.Document
         view = uiapp.ActiveUIDocument.ActiveView
         
+        # Guard clause: ensure we are in a plan view
         if not isinstance(view, DB.ViewPlan):
             return
 
+        # Convert the UI Millimeters to Revit Internal Feet
+        offset_in_feet = UnitUtils.ConvertToInternalUnits(
+            self.new_offset_mm, 
+            UnitTypeId.Millimeters
+        )
+
         try:
-            with DB.Transaction(doc, "Live View Range") as t:
+            # Wrap in a Transaction to save changes to the model
+            with DB.Transaction(doc, "Live View Range Change") as t:
                 t.Start()
                 vr = view.GetViewRange()
-                # Setting the Cut Plane offset (Standard Revit Internal Units: Feet)
-                vr.SetOffset(DB.PlanViewPlane.CutPlane, self.new_offset)
+                
+                # Update the Cut Plane
+                vr.SetOffset(DB.PlanViewPlane.CutPlane, offset_in_feet)
                 view.SetViewRange(vr)
-                t.Commit()
+                
+                t.Commit() # Essential to finalize the change
             
-            # This forces the Point Cloud and Geometry to redraw immediately
+            # Forces Revit to redraw point clouds and geometry immediately
             uiapp.ActiveUIDocument.RefreshActiveView()
+            
         except Exception as e:
-            print("Error updating view: {}".format(e))
+            print("Error updating view range: {}".format(e))
 
     def GetName(self):
-        return "View Range Live Updater"
+        return "View Range Live Metric Handler"
 
-# 2. THE WINDOW: This links the UI Slider to the Handler
+# 2. THE UI LOGIC: This connects the XAML Slider to the Worker above
 class LiveRangeWindow(forms.WPFWindow):
     def __init__(self, xaml_file_name):
         forms.WPFWindow.__init__(self, xaml_file_name)
         
-        # Setup the External Event
+        # Create the handler and the event "bridge"
         self.handler = ViewRangeUpdateHandler()
         self.ext_event = ExternalEvent.Create(self.handler)
         
-        # Initialize Slider starting position from current view
+        # Set slider to current view's actual value on startup
         cur_vr = revit.active_view.GetViewRange()
-        start_val = cur_vr.GetOffset(DB.PlanViewPlane.CutPlane)
-        self.OffsetSlider.Value = start_val
-        self.ValueDisplay.Text = "{} ft".format(round(start_val, 2))
+        cur_feet = cur_vr.GetOffset(DB.PlanViewPlane.CutPlane)
+        
+        # Convert internal feet back to MM for the UI display
+        cur_mm = UnitUtils.ConvertFromInternalUnits(cur_feet, UnitTypeId.Millimeters)
+        
+        self.OffsetSlider.Value = cur_mm
+        self.ValueDisplay.Text = "{} mm".format(int(cur_mm))
 
     def on_slider_change(self, sender, e):
-        # Update the handler with the new value from slider
-        self.handler.new_offset = self.OffsetSlider.Value
-        self.ValueDisplay.Text = "{} ft".format(round(self.OffsetSlider.Value, 2))
+        # 1. Update the value in our handler
+        self.handler.new_offset_mm = self.OffsetSlider.Value
         
-        # Tell Revit: "Run the handler when you are next idle"
+        # 2. Update the UI text label
+        self.ValueDisplay.Text = "{} mm".format(int(self.OffsetSlider.Value))
+        
+        # 3. Trigger the Revit update (This calls the Execute() method above)
         self.ext_event.Raise()
 
-# 3. EXECUTION
+# 3. STARTUP
 if __name__ == "__main__":
-    # Ensure we are in a Plan View
+    # Ensure the user is in a Plan View before opening the window
     if isinstance(revit.active_view, DB.ViewPlan):
         window = LiveRangeWindow("ui.xaml")
         window.show()
     else:
-        forms.alert("Please run this tool in a Floor Plan or Ceiling Plan.")
+        forms.alert("Please open a Floor Plan or Ceiling Plan first.")
