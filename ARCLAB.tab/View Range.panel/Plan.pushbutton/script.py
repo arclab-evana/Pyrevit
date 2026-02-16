@@ -100,7 +100,6 @@ class BurgerWindow(forms.WPFWindow):
         self.TopThumb.DragCompleted += self.trigger_revit
         self.BotThumb.DragCompleted += self.trigger_revit
         
-        # New Reset Button Event
         self.ResetButton.Click += self.reset_defaults
 
         self.update_visuals()
@@ -113,9 +112,7 @@ class BurgerWindow(forms.WPFWindow):
         except:
             pass
 
-    # --- MATH HELPERS ---
     def snap_to_5(self, val):
-        """Rounds value to nearest 5"""
         return round(val / 5.0) * 5.0
 
     def mm_to_px(self, mm_val):
@@ -165,13 +162,18 @@ class BurgerWindow(forms.WPFWindow):
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
+                # --- FIX: INCREASED PADDING ---
+                # Canvas Width in XAML is 78.
+                # Content Width = 60.
+                # Left Margin = (78-60)/2 = 9px.
+                
                 line = Rectangle()
                 line.Width = 60.0 
                 line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
                 line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
-                Canvas.SetLeft(line, 5.0) 
+                Canvas.SetLeft(line, 9.0) # 9px Padding Left
                 Canvas.SetTop(line, y_pos)
                 
                 label = TextBlock()
@@ -181,16 +183,14 @@ class BurgerWindow(forms.WPFWindow):
                 label.TextAlignment = TextAlignment.Right
                 label.Width = 60.0 
                 
-                Canvas.SetLeft(label, 5.0) 
+                Canvas.SetLeft(label, 9.0) # 9px Padding Left
                 Canvas.SetTop(label, y_pos - 11.0)
                 
                 self.SliderCanvas.Children.Insert(0, line)
                 self.SliderCanvas.Children.Insert(0, label)
 
-    # --- DRAG HANDLERS (With Snapping) ---
     def on_cut_drag(self, sender, e):
         delta_mm = -1 * (e.VerticalChange / self.CANVAS_HEIGHT) * (self.MAX_RANGE_MM - self.MIN_RANGE_MM)
-        # Apply Snap
         self.cut_mm = self.snap_to_5(self.cut_mm + delta_mm)
         self.update_visuals()
 
@@ -199,7 +199,6 @@ class BurgerWindow(forms.WPFWindow):
         new_tip_px = tip_px + e.VerticalChange
         new_abs = self.px_to_mm(new_tip_px)
         
-        # Calculate raw thickness then snap
         raw_thick = new_abs - self.cut_mm
         new_thick = self.snap_to_5(raw_thick)
 
@@ -219,7 +218,6 @@ class BurgerWindow(forms.WPFWindow):
         self.bot_thick = new_thick
         self.update_visuals()
 
-    # --- RESET HANDLER ---
     def reset_defaults(self, sender, args):
         self.cut_mm = 1500.0
         self.top_thick = 100.0

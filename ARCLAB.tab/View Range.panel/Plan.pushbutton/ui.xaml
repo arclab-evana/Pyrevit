@@ -6,7 +6,10 @@
 
     <Grid Margin="5">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <RowDefinition Height="*"/>    <RowDefinition Height="Auto"/> </Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
         <Border Grid.Row="0" BorderBrush="#CCC" BorderThickness="0,0,0,1" Margin="0,0,0,10" Padding="0,0,0,5">
             <TextBlock Name="ViewNameLabel" Text="FLOOR PLAN" 
@@ -27,11 +30,11 @@
             </StackPanel>
 
             <Border Grid.Column="1" BorderBrush="Black" BorderThickness="1" Background="White" CornerRadius="2">
-                <Canvas Name="SliderCanvas" Width="72" Height="350" ClipToBounds="True">
+                <Canvas Name="SliderCanvas" Width="78" Height="350" ClipToBounds="True">
                     
-                    <Rectangle Canvas.Left="35" Width="2" Height="800" Fill="#EEE"/>
+                    <Rectangle Canvas.Left="38" Width="2" Height="800" Fill="#EEE"/>
 
-                    <Thumb Name="CutThumb" Height="14" Width="18" Canvas.Left="50" Canvas.Top="150">
+                    <Thumb Name="CutThumb" Height="14" Width="18" Canvas.Left="53" Canvas.Top="150">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
@@ -48,7 +51,7 @@
                         </Thumb.Template>
                     </Thumb>
 
-                    <Thumb Name="TopThumb" Height="15" Width="30" Canvas.Left="21" Canvas.Top="50">
+                    <Thumb Name="TopThumb" Height="15" Width="30" Canvas.Left="24" Canvas.Top="50">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
@@ -58,7 +61,7 @@
                         </Thumb.Template>
                     </Thumb>
 
-                    <Thumb Name="BotThumb" Height="15" Width="30" Canvas.Left="21" Canvas.Top="250">
+                    <Thumb Name="BotThumb" Height="15" Width="30" Canvas.Left="24" Canvas.Top="250">
                         <Thumb.Template>
                             <ControlTemplate>
                                 <Grid>
