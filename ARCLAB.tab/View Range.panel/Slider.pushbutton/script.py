@@ -5,11 +5,11 @@ from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 from Autodesk.Revit.DB import UnitUtils, UnitTypeId, FilteredElementCollector
 
-# --- WPF IMPORTS FOR DYNAMIC DRAWING ---
+# --- WPF IMPORTS ---
 from System.Windows.Controls import Canvas, TextBlock
 from System.Windows.Shapes import Rectangle
 from System.Windows.Media import SolidColorBrush, Colors, DoubleCollection
-from System.Windows import Thickness, TextAlignment
+from System.Windows import TextAlignment
 
 # ---------------------------------------------------------------------
 # 1. THE WORKER (Revit updater)
@@ -87,8 +87,10 @@ class BurgerWindow(forms.WPFWindow):
         self.bot_thick = 600.0     
 
         # --- SETUP ---
-        self.ViewNameLabel.Text = revit.active_view.Name.upper()
-        self.draw_level_references() # <--- NEW: Draw Levels
+        if revit.active_view.Name:
+            self.ViewNameLabel.Text = revit.active_view.Name.upper()
+            
+        self.draw_level_references() 
         
         # Events
         self.CutThumb.DragDelta += self.on_cut_drag
@@ -103,7 +105,6 @@ class BurgerWindow(forms.WPFWindow):
 
     def mm_to_px(self, mm_val):
         total_span = self.MAX_RANGE_MM - self.MIN_RANGE_MM
-        # Protection against zero division
         if total_span == 0: return 0
         normalized = (mm_val - self.MIN_RANGE_MM) / total_span
         pixel_y = self.CANVAS_HEIGHT * (1.0 - normalized)
@@ -162,27 +163,28 @@ class BurgerWindow(forms.WPFWindow):
                 
                 # A. The Line
                 line = Rectangle()
-                line.Width = 100 # Span whole canvas
-                line.Height = 1
+                line.Width = 100.0 # Explicit double
+                line.Height = 1.0  # Explicit double
                 line.Fill = SolidColorBrush(Colors.Gray)
-                # Dashed effect
-                line.StrokeDashArray = DoubleCollection([4, 2])
+                
+                # --- FIX IS HERE: Must use floats (4.0, 2.0) not ints ---
+                line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
                 # Position
-                Canvas.SetLeft(line, 0)
+                Canvas.SetLeft(line, 0.0)
                 Canvas.SetTop(line, y_pos)
                 
                 # B. The Label
                 label = TextBlock()
                 label.Text = name
-                label.FontSize = 9
+                label.FontSize = 9.0
                 label.Foreground = SolidColorBrush(Colors.Gray)
                 label.TextAlignment = TextAlignment.Right
-                label.Width = 90
+                label.Width = 90.0
                 
                 # Position (Just above line)
-                Canvas.SetLeft(label, 0)
-                Canvas.SetTop(label, y_pos - 12)
+                Canvas.SetLeft(label, 0.0)
+                Canvas.SetTop(label, y_pos - 12.0)
                 
                 # Add to Canvas (Insert at index 0 to put behind thumbs)
                 self.SliderCanvas.Children.Insert(0, line)
