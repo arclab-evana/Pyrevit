@@ -3,8 +3,13 @@ __persistentengine__ = True
 
 from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
-from Autodesk.Revit.DB import UnitUtils, UnitTypeId
-from System.Windows.Controls import Canvas 
+from Autodesk.Revit.DB import UnitUtils, UnitTypeId, FilteredElementCollector
+
+# --- WPF IMPORTS FOR DYNAMIC DRAWING ---
+from System.Windows.Controls import Canvas, TextBlock
+from System.Windows.Shapes import Rectangle
+from System.Windows.Media import SolidColorBrush, Colors, DoubleCollection
+from System.Windows import Thickness, TextAlignment
 
 # ---------------------------------------------------------------------
 # 1. THE WORKER (Revit updater)
@@ -70,9 +75,6 @@ class BurgerWindow(forms.WPFWindow):
         self.handler = ViewRangeHandler()
         self.ext_event = ExternalEvent.Create(self.handler)
         
-        # --- NEW: Set View Name Label ---
-        self.ViewNameLabel.Text = revit.active_view.Name.upper()
-
         # --- CONFIGURATION ---
         self.MIN_THICKNESS = 10.0 
         self.MAX_RANGE_MM = 4000.0 
@@ -83,6 +85,10 @@ class BurgerWindow(forms.WPFWindow):
         self.cut_mm = 1200.0       
         self.top_thick = 600.0     
         self.bot_thick = 600.0     
+
+        # --- SETUP ---
+        self.ViewNameLabel.Text = revit.active_view.Name.upper()
+        self.draw_level_references() # <--- NEW: Draw Levels
         
         # Events
         self.CutThumb.DragDelta += self.on_cut_drag
@@ -97,6 +103,8 @@ class BurgerWindow(forms.WPFWindow):
 
     def mm_to_px(self, mm_val):
         total_span = self.MAX_RANGE_MM - self.MIN_RANGE_MM
+        # Protection against zero division
+        if total_span == 0: return 0
         normalized = (mm_val - self.MIN_RANGE_MM) / total_span
         pixel_y = self.CANVAS_HEIGHT * (1.0 - normalized)
         return pixel_y
@@ -107,6 +115,80 @@ class BurgerWindow(forms.WPFWindow):
         mm_val = self.MIN_RANGE_MM + (normalized * total_span)
         return mm_val
     
+    # --- LEVEL REFERENCE LOGIC ---
+    def draw_level_references(self):
+        """Finds levels and draws dashed lines on the canvas."""
+        doc = revit.doc
+        view = revit.active_view
+        
+        if not isinstance(view, DB.ViewPlan) or not view.GenLevel:
+            return
+
+        current_level = view.GenLevel
+        current_elev = current_level.Elevation
+        
+        # 1. Find relevant levels
+        levels = FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
+        levels = sorted(levels, key=lambda x: x.Elevation)
+        
+        # Determine offsets in MM
+        ref_levels = []
+        
+        # Always add Current Level (Offset 0)
+        ref_levels.append(("LEVEL 0", 0.0))
+        
+        # Find Next Above and Next Below
+        for i, lvl in enumerate(levels):
+            if lvl.Id == current_level.Id:
+                # Level Below
+                if i > 0:
+                    below = levels[i-1]
+                    delta = below.Elevation - current_elev
+                    mm = UnitUtils.ConvertFromInternalUnits(delta, UnitTypeId.Millimeters)
+                    ref_levels.append((below.Name.upper(), mm))
+                # Level Above
+                if i < len(levels) - 1:
+                    above = levels[i+1]
+                    delta = above.Elevation - current_elev
+                    mm = UnitUtils.ConvertFromInternalUnits(delta, UnitTypeId.Millimeters)
+                    ref_levels.append((above.Name.upper(), mm))
+                break
+        
+        # 2. Draw them on Canvas
+        for name, mm in ref_levels:
+            # Check if visible in our scale
+            if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
+                y_pos = self.mm_to_px(mm)
+                
+                # A. The Line
+                line = Rectangle()
+                line.Width = 100 # Span whole canvas
+                line.Height = 1
+                line.Fill = SolidColorBrush(Colors.Gray)
+                # Dashed effect
+                line.StrokeDashArray = DoubleCollection([4, 2])
+                
+                # Position
+                Canvas.SetLeft(line, 0)
+                Canvas.SetTop(line, y_pos)
+                
+                # B. The Label
+                label = TextBlock()
+                label.Text = name
+                label.FontSize = 9
+                label.Foreground = SolidColorBrush(Colors.Gray)
+                label.TextAlignment = TextAlignment.Right
+                label.Width = 90
+                
+                # Position (Just above line)
+                Canvas.SetLeft(label, 0)
+                Canvas.SetTop(label, y_pos - 12)
+                
+                # Add to Canvas (Insert at index 0 to put behind thumbs)
+                self.SliderCanvas.Children.Insert(0, line)
+                self.SliderCanvas.Children.Insert(0, label)
+
+    # --- DRAG HANDLERS ---
     def on_cut_drag(self, sender, e):
         delta_mm = -1 * (e.VerticalChange / self.CANVAS_HEIGHT) * (self.MAX_RANGE_MM - self.MIN_RANGE_MM)
         self.cut_mm += delta_mm
