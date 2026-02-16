@@ -9,6 +9,7 @@ class ViewRangeUpdateHandler(IExternalEventHandler):
         self.new_offset_mm = 0.0
 
     def Execute(self, uiapp):
+        print("--- Handler Triggered ---") # If this doesn't show up, the Event isn't Raising.
         doc = uiapp.ActiveUIDocument.Document
         view = uiapp.ActiveUIDocument.ActiveView
         
