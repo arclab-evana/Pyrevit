@@ -20,7 +20,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="40"/> <ColumnDefinition Width="*"/>  </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,2,0">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="5,0,2,0">
                 <TextBlock Name="TopLabel" Text="+600" Foreground="Black" Margin="0,0,0,30" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
                 <TextBlock Name="CutLabel" Text="1200" Foreground="Black" Margin="0,0,0,30" FontWeight="Bold" FontSize="14" HorizontalAlignment="Right"/>
                 <TextBlock Name="BotLabel" Text="-600" Foreground="Black" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
