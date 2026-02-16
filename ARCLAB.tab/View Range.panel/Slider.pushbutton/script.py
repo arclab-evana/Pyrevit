@@ -5,6 +5,9 @@ from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 from Autodesk.Revit.DB import UnitUtils, UnitTypeId
 
+# --- FIX: Import Canvas explicitly from Windows Controls ---
+from System.Windows.Controls import Canvas 
+
 # ---------------------------------------------------------------------
 # 1. THE WORKER (Revit updater)
 # ---------------------------------------------------------------------
@@ -182,7 +185,8 @@ class BurgerWindow(forms.WPFWindow):
     def move_thumb(self, thumb, mm_val):
         y_pos = self.mm_to_px(mm_val)
         # Center thumb vertically
-        thumb.SetValue(forms.Canvas.TopProperty, y_pos - (thumb.Height / 2.0))
+        # --- FIXED LINE BELOW: Use Canvas.TopProperty ---
+        thumb.SetValue(Canvas.TopProperty, y_pos - (thumb.Height / 2.0))
 
     # --- REVIT COMMUNICATION ---
     def trigger_revit(self, sender, e):
