@@ -90,10 +90,8 @@ class BurgerWindow(forms.WPFWindow):
         self.check_active_view(None, None) 
         self.draw_level_references() 
         
-        # Events: Mouse Move checks for view changes (Modeless Trick)
         self.MouseMove += self.check_active_view
 
-        # Drag Events
         self.CutThumb.DragDelta += self.on_cut_drag
         self.TopThumb.DragDelta += self.on_top_drag
         self.BotThumb.DragDelta += self.on_bot_drag
@@ -104,9 +102,7 @@ class BurgerWindow(forms.WPFWindow):
 
         self.update_visuals()
 
-    # --- VIEW CHECKER ---
     def check_active_view(self, sender, args):
-        """Updates the label if the user switches views."""
         try:
             v = revit.active_view
             if v:
@@ -114,7 +110,6 @@ class BurgerWindow(forms.WPFWindow):
         except:
             pass
 
-    # --- MATH HELPERS ---
     def mm_to_px(self, mm_val):
         total_span = self.MAX_RANGE_MM - self.MIN_RANGE_MM
         if total_span == 0: return 0
@@ -128,7 +123,6 @@ class BurgerWindow(forms.WPFWindow):
         mm_val = self.MIN_RANGE_MM + (normalized * total_span)
         return mm_val
     
-    # --- LEVEL REFERENCE LOGIC ---
     def draw_level_references(self):
         doc = revit.doc
         view = revit.active_view
@@ -164,11 +158,10 @@ class BurgerWindow(forms.WPFWindow):
                 y_pos = self.mm_to_px(mm)
                 
                 line = Rectangle()
-                line.Width = 100.0
+                line.Width = 80.0 # Matched to new Canvas Width
                 line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
-                # Fixed float casting for IronPython
-                line.StrokeDashArray = DoubleCollection([4.0, 2.0]) 
+                line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
                 Canvas.SetLeft(line, 0.0)
                 Canvas.SetTop(line, y_pos)
@@ -178,7 +171,7 @@ class BurgerWindow(forms.WPFWindow):
                 label.FontSize = 9.0
                 label.Foreground = SolidColorBrush(Colors.Gray)
                 label.TextAlignment = TextAlignment.Right
-                label.Width = 90.0
+                label.Width = 75.0
                 
                 Canvas.SetLeft(label, 0.0)
                 Canvas.SetTop(label, y_pos - 12.0)
@@ -186,14 +179,12 @@ class BurgerWindow(forms.WPFWindow):
                 self.SliderCanvas.Children.Insert(0, line)
                 self.SliderCanvas.Children.Insert(0, label)
 
-    # --- DRAG HANDLERS ---
     def on_cut_drag(self, sender, e):
         delta_mm = -1 * (e.VerticalChange / self.CANVAS_HEIGHT) * (self.MAX_RANGE_MM - self.MIN_RANGE_MM)
         self.cut_mm += delta_mm
         self.update_visuals()
 
     def on_top_drag(self, sender, e):
-        # Anchor Logic: Mouse drags the TIP (Bottom) of the arrow
         tip_px = self.mm_to_px(self.cut_mm + self.top_thick)
         new_tip_px = tip_px + e.VerticalChange
         new_abs = self.px_to_mm(new_tip_px)
@@ -204,7 +195,6 @@ class BurgerWindow(forms.WPFWindow):
         self.update_visuals()
 
     def on_bot_drag(self, sender, e):
-        # Anchor Logic: Mouse drags the TIP (Top) of the arrow
         tip_px = self.mm_to_px(self.cut_mm - self.bot_thick)
         new_tip_px = tip_px + e.VerticalChange
         new_abs = self.px_to_mm(new_tip_px)
@@ -222,9 +212,6 @@ class BurgerWindow(forms.WPFWindow):
         self.CutLabel.Text = "{}".format(int(self.cut_mm))
         self.BotLabel.Text = "-{}".format(int(self.bot_thick))
 
-        # Anchor Logic:
-        # Top Thumb: Tip is at the Bottom of the image -> anchor="bottom"
-        # Bot Thumb: Tip is at the Top of the image -> anchor="top"
         self.move_thumb(self.TopThumb, top_abs, anchor="bottom")
         self.move_thumb(self.CutThumb, self.cut_mm, anchor="center")
         self.move_thumb(self.BotThumb, bot_abs, anchor="top")
