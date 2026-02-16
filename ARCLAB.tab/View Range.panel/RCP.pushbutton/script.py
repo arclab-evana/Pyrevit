@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 __persistentengine__ = True
 
+import os
 from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
 from Autodesk.Revit.DB import UnitUtils, UnitTypeId, FilteredElementCollector
@@ -16,25 +17,23 @@ from System.Windows import TextAlignment
 # ---------------------------------------------------------------------
 class RCPRangeHandler(IExternalEventHandler):
     def __init__(self):
-        self.cut_mm = 2300.0       # Default higher for RCP
-        self.top_offset_mm = 600.0  # Extension above cut
-        self.view_depth_mm = 0.0    # Usually same as Top in RCP
+        self.cut_mm = 2300.0       
+        self.top_offset_mm = 600.0  
+        self.view_depth_mm = 0.0    
 
     def Execute(self, uiapp):
         try:
             doc = uiapp.ActiveUIDocument.Document
             view = uiapp.ActiveUIDocument.ActiveView
             
-            # RCP typically looks UP from the Level
+            # RCP View Range Logic
             cut_ft = UnitUtils.ConvertToInternalUnits(self.cut_mm, UnitTypeId.Millimeters)
             top_ft = UnitUtils.ConvertToInternalUnits(self.cut_mm + self.top_offset_mm, UnitTypeId.Millimeters)
-            bot_ft = 0.0 # Bottom is usually at the Level
-            # View Depth in RCP is typically equal to or above the Top Plane
+            bot_ft = 0.0 
             depth_ft = top_ft + UnitUtils.ConvertToInternalUnits(self.view_depth_mm, UnitTypeId.Millimeters)
 
             with DB.Transaction(doc, "RCP Burger Update") as t:
                 t.Start()
-                
                 vr = view.GetViewRange()
                 assoc_level_id = view.GenLevel.Id
                 
@@ -46,7 +45,6 @@ class RCPRangeHandler(IExternalEventHandler):
                 for p in planes:
                     vr.SetLevelId(p, assoc_level_id)
 
-                # Set the RCP Hierarchy
                 vr.SetOffset(DB.PlanViewPlane.BottomClipPlane, bot_ft)
                 vr.SetOffset(DB.PlanViewPlane.CutPlane, cut_ft)
                 vr.SetOffset(DB.PlanViewPlane.TopClipPlane, top_ft)
@@ -56,7 +54,6 @@ class RCPRangeHandler(IExternalEventHandler):
                 t.Commit() 
             
             uiapp.ActiveUIDocument.RefreshActiveView()
-            
         except Exception:
             pass
 
@@ -68,7 +65,7 @@ class RCPRangeHandler(IExternalEventHandler):
 # ---------------------------------------------------------------------
 class BurgerWindowRCP(forms.WPFWindow):
     def __init__(self, xaml_file_name):
-        forms.WPFWindow.__init__(self, xaml_file_name)
+        [cite_start]forms.WPFWindow.__init__(self, xaml_file_name) # [cite: 6]
         
         self.handler = RCPRangeHandler()
         self.ext_event = ExternalEvent.Create(self.handler)
@@ -81,8 +78,7 @@ class BurgerWindowRCP(forms.WPFWindow):
         
         # --- STATE ---
         self.cut_mm = 2300.0       
-        self.top_thick = 700.0     
-        self.bot_thick = 2300.0 # This visually represents distance from Level to Cut
+        self.top_thick = 600.0     
 
         self.check_active_view(None, None) 
         self.draw_level_references() 
@@ -102,7 +98,7 @@ class BurgerWindowRCP(forms.WPFWindow):
         try:
             v = revit.active_view
             if v:
-                self.ViewNameLabel.Text = v.Name.upper() [cite: 2]
+                self.ViewNameLabel.Text = v.Name.upper()
         except:
             pass
 
@@ -143,7 +139,6 @@ class BurgerWindowRCP(forms.WPFWindow):
     def on_cut_drag(self, sender, e):
         delta_mm = -1 * (e.VerticalChange / self.CANVAS_HEIGHT) * (self.MAX_RANGE_MM - self.MIN_RANGE_MM)
         self.cut_mm = self.snap_to_5(self.cut_mm + delta_mm)
-        self.bot_thick = self.cut_mm # Keeps bottom relative to level
         self.update_visuals()
 
     def on_top_drag(self, sender, e):
@@ -152,22 +147,48 @@ class BurgerWindowRCP(forms.WPFWindow):
         self.update_visuals()
 
     def on_bot_drag(self, sender, e):
-        # In RCP, 'Bot' dragging moves the Cut Plane height from the floor
         new_abs = self.px_to_mm(self.mm_to_px(self.cut_mm) + e.VerticalChange)
         self.cut_mm = max(self.MIN_THICKNESS, self.snap_to_5(new_abs))
-        self.bot_thick = self.cut_mm
         self.update_visuals()
 
+    # --- NEW HELPER FOR RESET LOGIC ---
+    def get_upper_level_delta(self):
+        doc = revit.doc
+        view = revit.active_view
+        if not view.GenLevel: return None
+        
+        current_elev = view.GenLevel.Elevation
+        # Get all levels and sort by elevation
+        levels = FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
+        levels = sorted(levels, key=lambda x: x.Elevation)
+        
+        # Find the first level that is higher than current level
+        for lvl in levels:
+            if lvl.Elevation > (current_elev + 0.01): # Small tolerance to avoid floating point errors
+                diff = lvl.Elevation - current_elev
+                return UnitUtils.ConvertFromInternalUnits(diff, UnitTypeId.Millimeters)
+        return None
+
     def reset_defaults(self, sender, args):
-        self.cut_mm = 2300.0
-        self.top_thick = 600.0
+        # Calculate distance to next level
+        upper_level_mm = self.get_upper_level_delta()
+        
+        if upper_level_mm:
+            # Rule: Top at Upper Level, Cut 200mm below it
+            self.cut_mm = upper_level_mm - 200.0
+            self.top_thick = 200.0
+        else:
+            # Fallback if no upper level exists (e.g. Roof)
+            self.cut_mm = 2300.0
+            self.top_thick = 600.0
+
         self.update_visuals()
         self.trigger_revit(None, None)
 
     def update_visuals(self):
         self.TopLabel.Text = "+{}".format(int(self.top_thick))
         self.CutLabel.Text = "{}".format(int(self.cut_mm))
-        self.BotLabel.Text = "LEVEL" # RCP bottom is almost always the level
+        self.BotLabel.Text = "LEVEL"
 
         self.move_thumb(self.TopThumb, self.cut_mm + self.top_thick, anchor="bottom")
         self.move_thumb(self.CutThumb, self.cut_mm, anchor="center")
@@ -187,7 +208,13 @@ class BurgerWindowRCP(forms.WPFWindow):
 if __name__ == "__main__":
     v = revit.active_view
     if isinstance(v, DB.ViewPlan) and v.ViewType == DB.ViewType.CeilingPlan:
-        window = BurgerWindowRCP("ui_rcp.xaml")
-        window.show()
+        cur_dir = os.path.dirname(__file__)
+        xaml_file = os.path.join(cur_dir, "ui.xaml")
+        
+        if os.path.exists(xaml_file):
+            window = BurgerWindowRCP(xaml_file)
+            window.show()
+        else:
+            forms.alert("Could not find ui.xaml at:\n{}".format(xaml_file))
     else:
-        forms.alert("Please open a Reflected Ceiling Plan.")
+        forms.alert("Please open a Reflected Ceiling Plan first.")
