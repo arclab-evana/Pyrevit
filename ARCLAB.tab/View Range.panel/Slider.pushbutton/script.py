@@ -80,6 +80,7 @@ class BurgerWindow(forms.WPFWindow):
         self.MAX_RANGE_MM = 4000.0 
         self.MIN_RANGE_MM = -1000.0 
         self.CANVAS_HEIGHT = 350.0 
+        self.CANVAS_WIDTH = 80.0 # Match XAML
         
         # --- STATE ---
         self.cut_mm = 1200.0       
@@ -157,24 +158,29 @@ class BurgerWindow(forms.WPFWindow):
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
+                # --- UPDATE: Fit inside box logic ---
+                # Canvas Width is 80. We use 70 width, offset 5px from left.
+                line_width = 70.0 
+                left_margin = 5.0
+                
                 line = Rectangle()
-                line.Width = 80.0 # Matched to new Canvas Width
+                line.Width = line_width 
                 line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
                 line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
-                Canvas.SetLeft(line, 0.0)
+                Canvas.SetLeft(line, left_margin)
                 Canvas.SetTop(line, y_pos)
                 
                 label = TextBlock()
                 label.Text = name
-                label.FontSize = 9.0
+                label.FontSize = 8.0 # Slightly smaller to fit
                 label.Foreground = SolidColorBrush(Colors.Gray)
                 label.TextAlignment = TextAlignment.Right
-                label.Width = 75.0
+                label.Width = line_width
                 
-                Canvas.SetLeft(label, 0.0)
-                Canvas.SetTop(label, y_pos - 12.0)
+                Canvas.SetLeft(label, left_margin)
+                Canvas.SetTop(label, y_pos - 11.0)
                 
                 self.SliderCanvas.Children.Insert(0, line)
                 self.SliderCanvas.Children.Insert(0, label)
