@@ -3,7 +3,7 @@ __persistentengine__ = True
 
 from pyrevit import forms, revit, DB
 from Autodesk.Revit.UI import IExternalEventHandler, ExternalEvent
-from Autodesk.Revit.DB import UnitUtils, UnitTypeId, FilteredElementCollector
+from Autodesk.Revit.DB import UnitUtils, UnitTypeId, FilteredElementCollector, PlanViewPlane
 
 # --- WPF IMPORTS ---
 from System.Windows.Controls import Canvas, TextBlock
@@ -33,6 +33,8 @@ class ViewRangeHandler(IExternalEventHandler):
             cut_ft = UnitUtils.ConvertToInternalUnits(cut_abs, UnitTypeId.Millimeters)
             top_ft = UnitUtils.ConvertToInternalUnits(top_abs, UnitTypeId.Millimeters)
             bot_ft = UnitUtils.ConvertToInternalUnits(bot_abs, UnitTypeId.Millimeters)
+            
+            # Depth matches bottom for this simplified tool
             depth_ft = bot_ft - UnitUtils.ConvertToInternalUnits(100, UnitTypeId.Millimeters)
 
             with DB.Transaction(doc, "Burger Range Update") as t:
@@ -81,10 +83,14 @@ class BurgerWindow(forms.WPFWindow):
         self.MIN_RANGE_MM = -1000.0 
         self.CANVAS_HEIGHT = 350.0 
         
-        # --- STATE ---
+        # --- STATE INITIALIZATION ---
+        # Default Fallbacks
         self.cut_mm = 1200.0       
         self.top_thick = 600.0     
         self.bot_thick = 600.0     
+        
+        # Try to read actual Revit values
+        self.init_from_current_view()
 
         # --- SETUP ---
         self.check_active_view(None, None) 
@@ -103,6 +109,36 @@ class BurgerWindow(forms.WPFWindow):
         self.ResetButton.Click += self.reset_defaults
 
         self.update_visuals()
+
+    def init_from_current_view(self):
+        """Reads the current active view's View Range and updates UI state."""
+        try:
+            view = revit.active_view
+            if isinstance(view, DB.ViewPlan):
+                vr = view.GetViewRange()
+                
+                # Helper to extract MM from a specific plane
+                def get_plane_mm(plane_enum):
+                    val_ft = vr.GetOffset(plane_enum)
+                    return UnitUtils.ConvertFromInternalUnits(val_ft, UnitTypeId.Millimeters)
+
+                # Get absolute MM values from Revit
+                abs_cut = get_plane_mm(PlanViewPlane.CutPlane)
+                abs_top = get_plane_mm(PlanViewPlane.TopClipPlane)
+                abs_bot = get_plane_mm(PlanViewPlane.BottomClipPlane)
+                
+                # Convert to "Burger" logic (Offsets relative to Cut)
+                self.cut_mm = abs_cut
+                self.top_thick = abs_top - abs_cut
+                self.bot_thick = abs_cut - abs_bot
+                
+                # Sanity check to prevent negative thickness if Revit data is weird
+                if self.top_thick < self.MIN_THICKNESS: self.top_thick = self.MIN_THICKNESS
+                if self.bot_thick < self.MIN_THICKNESS: self.bot_thick = self.MIN_THICKNESS
+        except Exception as e:
+            # If reading fails (e.g. view template, invalid view type), stick to defaults
+            print("Could not read existing view range: {}".format(e))
+            pass
 
     def check_active_view(self, sender, args):
         try:
@@ -162,18 +198,13 @@ class BurgerWindow(forms.WPFWindow):
             if self.MIN_RANGE_MM <= mm <= self.MAX_RANGE_MM:
                 y_pos = self.mm_to_px(mm)
                 
-                # --- FIX: INCREASED PADDING ---
-                # Canvas Width in XAML is 78.
-                # Content Width = 60.
-                # Left Margin = (78-60)/2 = 9px.
-                
                 line = Rectangle()
                 line.Width = 60.0 
                 line.Height = 1.0
                 line.Fill = SolidColorBrush(Colors.Gray)
                 line.StrokeDashArray = DoubleCollection([4.0, 2.0])
                 
-                Canvas.SetLeft(line, 9.0) # 9px Padding Left
+                Canvas.SetLeft(line, 9.0) 
                 Canvas.SetTop(line, y_pos)
                 
                 label = TextBlock()
@@ -183,7 +214,7 @@ class BurgerWindow(forms.WPFWindow):
                 label.TextAlignment = TextAlignment.Right
                 label.Width = 60.0 
                 
-                Canvas.SetLeft(label, 9.0) # 9px Padding Left
+                Canvas.SetLeft(label, 9.0) 
                 Canvas.SetTop(label, y_pos - 11.0)
                 
                 self.SliderCanvas.Children.Insert(0, line)
