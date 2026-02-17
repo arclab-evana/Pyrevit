@@ -27,6 +27,7 @@ class RCPRangeHandler(IExternalEventHandler):
             view = uiapp.ActiveUIDocument.ActiveView
             
             # RCP View Range Logic
+            # Convert MM inputs to Internal Feet
             cut_ft = UnitUtils.ConvertToInternalUnits(self.cut_mm, UnitTypeId.Millimeters)
             top_ft = UnitUtils.ConvertToInternalUnits(self.cut_mm + self.top_offset_mm, UnitTypeId.Millimeters)
             bot_ft = 0.0 
@@ -65,7 +66,7 @@ class RCPRangeHandler(IExternalEventHandler):
 # ---------------------------------------------------------------------
 class BurgerWindowRCP(forms.WPFWindow):
     def __init__(self, xaml_file_name):
-        [cite_start]forms.WPFWindow.__init__(self, xaml_file_name) # [cite: 6]
+        forms.WPFWindow.__init__(self, xaml_file_name) 
         
         self.handler = RCPRangeHandler()
         self.ext_event = ExternalEvent.Create(self.handler)
@@ -83,13 +84,17 @@ class BurgerWindowRCP(forms.WPFWindow):
         self.check_active_view(None, None) 
         self.draw_level_references() 
         
+        # Event Hookups
         self.MouseMove += self.check_active_view
         self.CutThumb.DragDelta += self.on_cut_drag
         self.TopThumb.DragDelta += self.on_top_drag
         self.BotThumb.DragDelta += self.on_bot_drag
+        
+        # Trigger Revit on release
         self.CutThumb.DragCompleted += self.trigger_revit
         self.TopThumb.DragCompleted += self.trigger_revit
         self.BotThumb.DragCompleted += self.trigger_revit
+        
         self.ResetButton.Click += self.reset_defaults
 
         self.update_visuals()
@@ -142,43 +147,46 @@ class BurgerWindowRCP(forms.WPFWindow):
         self.update_visuals()
 
     def on_top_drag(self, sender, e):
+        # Top moves relative to Cut
         new_abs = self.px_to_mm(self.mm_to_px(self.cut_mm + self.top_thick) + e.VerticalChange)
         self.top_thick = max(self.MIN_THICKNESS, self.snap_to_5(new_abs - self.cut_mm))
         self.update_visuals()
 
     def on_bot_drag(self, sender, e):
+        # Bottom Drag adjusts cut height in RCP mode
         new_abs = self.px_to_mm(self.mm_to_px(self.cut_mm) + e.VerticalChange)
         self.cut_mm = max(self.MIN_THICKNESS, self.snap_to_5(new_abs))
         self.update_visuals()
 
-    # --- NEW HELPER FOR RESET LOGIC ---
+    # --- RESET LOGIC ---
     def get_upper_level_delta(self):
         doc = revit.doc
         view = revit.active_view
         if not view.GenLevel: return None
         
         current_elev = view.GenLevel.Elevation
-        # Get all levels and sort by elevation
+        # Get levels sorted by elevation
         levels = FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
         levels = sorted(levels, key=lambda x: x.Elevation)
         
-        # Find the first level that is higher than current level
+        # Find the next level up
         for lvl in levels:
-            if lvl.Elevation > (current_elev + 0.01): # Small tolerance to avoid floating point errors
+            if lvl.Elevation > (current_elev + 0.01): # Tolerance
                 diff = lvl.Elevation - current_elev
                 return UnitUtils.ConvertFromInternalUnits(diff, UnitTypeId.Millimeters)
         return None
 
     def reset_defaults(self, sender, args):
-        # Calculate distance to next level
         upper_level_mm = self.get_upper_level_delta()
         
         if upper_level_mm:
-            # Rule: Top at Upper Level, Cut 200mm below it
+            # Set Cut Plane 200mm below the upper level
             self.cut_mm = upper_level_mm - 200.0
+            # Set Top of Range exactly at the Upper Level
+            # (If cut is at Upper-200, then Top thickness needs to be 200 to reach Upper)
             self.top_thick = 200.0
         else:
-            # Fallback if no upper level exists (e.g. Roof)
+            # Fallback if no level above (e.g. Roof)
             self.cut_mm = 2300.0
             self.top_thick = 600.0
 
@@ -209,12 +217,13 @@ if __name__ == "__main__":
     v = revit.active_view
     if isinstance(v, DB.ViewPlan) and v.ViewType == DB.ViewType.CeilingPlan:
         cur_dir = os.path.dirname(__file__)
+        # Ensure your file is named ui.xaml (not .xmal)
         xaml_file = os.path.join(cur_dir, "ui.xaml")
         
         if os.path.exists(xaml_file):
             window = BurgerWindowRCP(xaml_file)
             window.show()
         else:
-            forms.alert("Could not find ui.xaml at:\n{}".format(xaml_file))
+            forms.alert("Could not find ui.xaml.\nPlease check the file extension is .xaml, not .xmal")
     else:
         forms.alert("Please open a Reflected Ceiling Plan first.")
