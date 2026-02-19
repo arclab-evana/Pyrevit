@@ -1,8 +1,13 @@
 """
 3-Click Section Tool (Succinct Edition)
-Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth, Auto-Open
+Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth, Auto-Open, Delayed Crop Removal
 """
 import math
+import time
+import clr
+clr.AddReference("System.Windows.Forms")
+from System.Windows.Forms import Application
+
 from pyrevit import revit, DB, forms
 
 doc = revit.doc
@@ -16,6 +21,7 @@ DEFAULT_HEIGHT_MM = 3000
 MIN_SECTION_LENGTH_MM = 50
 MIN_DEPTH_MM = 50
 DEFAULT_DEPTH_MM = 500
+DELAY_CROP_REMOVAL_SEC = 0.1 # Adjust this to change how long the crop view stays before disappearing
 
 # --- HELPER FUNCTIONS ---
 def mm_to_ft(mm):
@@ -147,8 +153,7 @@ def create_3_click_section():
         section_type = get_default_section_type()
         new_section = DB.ViewSection.CreateSection(doc, section_type.Id, bbox)
         
-        # --- UPDATED PROPERTIES ---
-        new_section.CropBoxActive = False # Untick Crop View
+        # Set bounds but DO NOT turn off crop yet
         new_section.get_Parameter(DB.BuiltInParameter.VIEWER_BOUND_FAR_CLIPPING).Set(1)
         new_section.get_Parameter(DB.BuiltInParameter.VIEWER_BOUND_OFFSET_FAR).Set(depth_dist_ft)
 
@@ -157,9 +162,28 @@ def create_3_click_section():
 
         # --- AUTO-OPEN VIEW ---
         uidoc.ActiveView = new_section
+        
+        # --- FORCED UI REFRESH & DELAY ---
+        # This tells Revit to stop and actually draw the cropped view on your screen
+        Application.DoEvents() 
+        time.sleep(DELAY_CROP_REMOVAL_SEC) 
+        
+        # --- REMOVE CROP ---
+        t_crop = DB.Transaction(doc, "Remove Crop View")
+        t_crop.Start()
+        
+        # Fetch the element again just to ensure it's valid in this new transaction
+        view_to_uncrop = doc.GetElement(new_section.Id)
+        view_to_uncrop.CropBoxActive = False
+        
+        t_crop.Commit()
+
+        # Update screen one last time so you immediately see the crop disappear
+        Application.DoEvents()
 
     except Exception as e:
-        tg.RollBack()
+        if tg.HasStarted():
+            tg.RollBack()
         if "Operation canceled" not in str(e):
             forms.alert("Error: {}".format(e))
 

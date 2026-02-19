@@ -4,9 +4,9 @@ Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth, Auto
 """
 import math
 import time
-import clr # Added for UI refresh
+import clr
 clr.AddReference("System.Windows.Forms")
-from System.Windows.Forms import Application # Added for UI refresh
+from System.Windows.Forms import Application
 
 from pyrevit import revit, DB, forms
 
@@ -21,6 +21,7 @@ DEFAULT_HEIGHT_MM = 3000
 MIN_SECTION_LENGTH_MM = 50
 MIN_DEPTH_MM = 50
 DEFAULT_DEPTH_MM = 500
+DELAY_CROP_REMOVAL_SEC = 0.1 # Adjust this to change how long the crop view stays before disappearing
 
 # --- HELPER FUNCTIONS ---
 def mm_to_ft(mm):
@@ -165,7 +166,7 @@ def create_3_click_section():
         # --- FORCED UI REFRESH & DELAY ---
         # This tells Revit to stop and actually draw the cropped view on your screen
         Application.DoEvents() 
-        time.sleep(0.3)
+        time.sleep(DELAY_CROP_REMOVAL_SEC) 
         
         # --- REMOVE CROP ---
         t_crop = DB.Transaction(doc, "Remove Crop View")
