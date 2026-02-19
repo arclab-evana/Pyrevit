@@ -81,6 +81,9 @@ class BurgerWindowRCP(forms.WPFWindow):
         self.cut_mm = 2300.0       
         self.top_thick = 600.0     
 
+        # Try to read actual Revit values to overwrite defaults
+        self.init_from_current_view()
+
         self.check_active_view(None, None) 
         self.draw_level_references() 
         
@@ -98,6 +101,34 @@ class BurgerWindowRCP(forms.WPFWindow):
         self.ResetButton.Click += self.reset_defaults
 
         self.update_visuals()
+
+    def init_from_current_view(self):
+        """Reads the current active RCP's View Range and updates UI state."""
+        try:
+            view = revit.active_view
+            if isinstance(view, DB.ViewPlan) and view.ViewType == DB.ViewType.CeilingPlan:
+                vr = view.GetViewRange()
+                
+                # Helper to extract MM from a specific plane
+                def get_plane_mm(plane_enum):
+                    val_ft = vr.GetOffset(plane_enum)
+                    return UnitUtils.ConvertFromInternalUnits(val_ft, UnitTypeId.Millimeters)
+
+                # Get absolute MM values from Revit
+                abs_cut = get_plane_mm(DB.PlanViewPlane.CutPlane)
+                abs_top = get_plane_mm(DB.PlanViewPlane.TopClipPlane)
+                
+                # Convert to "Burger" logic
+                self.cut_mm = abs_cut
+                self.top_thick = abs_top - abs_cut
+                
+                # Sanity check to prevent negative thickness
+                if self.top_thick < self.MIN_THICKNESS: 
+                    self.top_thick = self.MIN_THICKNESS
+        except Exception as e:
+            # If reading fails, stick to defaults
+            print("Could not read existing view range: {}".format(e))
+            pass
 
     def check_active_view(self, sender, args):
         try:
