@@ -5,6 +5,7 @@ from pyrevit import revit, DB, forms
 
 doc = revit.doc
 uidoc = revit.uidoc
+__doc__ = "Perpendicular sections for QA/QC windows"
 
 # --- SETTINGS --- 
 SECTION_TYPE_NAME = "AL_Section" #Find Section type and applies it to section. 

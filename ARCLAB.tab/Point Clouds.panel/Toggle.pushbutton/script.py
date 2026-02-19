@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-__title__ = "Toggle Point Clouds"
 __doc__ = "Toggles the visibility of all point clouds in the active view."
 
 from Autodesk.Revit.DB import FilteredElementCollector, PointCloudInstance, Transaction

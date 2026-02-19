@@ -7,6 +7,7 @@ from pyrevit import revit, DB, forms
 
 doc = revit.doc
 uidoc = revit.uidoc
+__doc__ = "One-stop-shop for creating section views." 
 
 # --- SETTINGS ---
 ORTHO_TOLERANCE_DEGREES = 15
