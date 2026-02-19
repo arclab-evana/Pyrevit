@@ -1,6 +1,6 @@
 """
 3-Click Section Tool (Succinct Edition)
-Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth, Auto-Open, Delayed Crop Removal
+Features: Breadcrumb Anchor, Temp Connector, Ortho Snapping, Dynamic Depth, Auto-Open, Delayed Crop Removal & Visibility
 """
 import math
 import time
@@ -21,7 +21,8 @@ DEFAULT_HEIGHT_MM = 3000
 MIN_SECTION_LENGTH_MM = 50
 MIN_DEPTH_MM = 50
 DEFAULT_DEPTH_MM = 500
-DELAY_CROP_REMOVAL_SEC = 0.1 # Adjust this to change how long the crop view stays before disappearing
+DELAY_CROP_REMOVAL_SEC = 0.3 # Time before "Crop View" is unticked
+DELAY_CROP_VISIBLE_SEC = 0.3 # Time after unticking "Crop View" before "Crop Region Visible" is unticked
 
 # --- HELPER FUNCTIONS ---
 def mm_to_ft(mm):
@@ -163,22 +164,33 @@ def create_3_click_section():
         # --- AUTO-OPEN VIEW ---
         uidoc.ActiveView = new_section
         
-        # --- FORCED UI REFRESH & DELAY ---
-        # This tells Revit to stop and actually draw the cropped view on your screen
+        # --- FORCED UI REFRESH & DELAY 1 ---
         Application.DoEvents() 
         time.sleep(DELAY_CROP_REMOVAL_SEC) 
         
-        # --- REMOVE CROP ---
+        # --- REMOVE CROP VIEW ---
         t_crop = DB.Transaction(doc, "Remove Crop View")
         t_crop.Start()
         
-        # Fetch the element again just to ensure it's valid in this new transaction
         view_to_uncrop = doc.GetElement(new_section.Id)
         view_to_uncrop.CropBoxActive = False
         
         t_crop.Commit()
 
-        # Update screen one last time so you immediately see the crop disappear
+        # --- FORCED UI REFRESH & DELAY 2 ---
+        Application.DoEvents()
+        time.sleep(DELAY_CROP_VISIBLE_SEC)
+
+        # --- HIDE CROP REGION VISIBILITY ---
+        t_crop_vis = DB.Transaction(doc, "Hide Crop Region")
+        t_crop_vis.Start()
+
+        view_to_hide_crop = doc.GetElement(new_section.Id)
+        view_to_hide_crop.CropBoxVisible = False
+
+        t_crop_vis.Commit()
+
+        # Final UI update
         Application.DoEvents()
 
     except Exception as e:
