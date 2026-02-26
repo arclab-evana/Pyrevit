@@ -5,6 +5,7 @@ from Autodesk.Revit.DB import TransactionGroup, Transaction, ViewType
 # Standard pyRevit access to Document and UI Document
 doc = revit.doc
 uidoc = revit.uidoc
+__doc__ = "Zooms back into relevant area""
 active_view = doc.ActiveView
 
 def run_zoom_sequence():
