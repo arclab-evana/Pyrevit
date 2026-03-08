@@ -1,0 +1,13 @@
+title: "Rationalise"
+tooltip: "Rationalise walls to nearest 5mm."
+
+# This stops the button from changing to "Set Up AL" after use
+sticky: false
+
+# This must match the folder "Execute.pushbutton"
+default: Execute AL
+
+# This defines the contents of the dropdown
+layout:
+  - Set Up AL
+  - Execute AL

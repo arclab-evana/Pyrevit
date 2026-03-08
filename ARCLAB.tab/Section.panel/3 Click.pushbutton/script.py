@@ -28,15 +28,22 @@ DELAY_CROP_VISIBLE_SEC = 0.3 # Time after unticking "Crop View" before "Crop Reg
 def mm_to_ft(mm):
     return DB.UnitUtils.ConvertToInternalUnits(mm, DB.UnitTypeId.Millimeters)
 
-def get_upper_level(current_level):
+def get_adjacent_levels(current_level):
+    """Finds the levels immediately above and below the current level by elevation."""
     all_levels = DB.FilteredElementCollector(doc).OfClass(DB.Level).ToElements()
     sorted_levels = sorted(all_levels, key=lambda l: l.Elevation)
+    
+    level_above = None
+    level_below = None
     
     for i, level in enumerate(sorted_levels):
         if level.Id == current_level.Id:
             if i + 1 < len(sorted_levels):
-                return sorted_levels[i+1]
-    return None
+                level_above = sorted_levels[i+1]
+            if i > 0:
+                level_below = sorted_levels[i-1]
+            break
+    return level_below, level_above
 
 def get_default_section_type():
     vt_collector = DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType)
@@ -129,16 +136,25 @@ def create_3_click_section():
 
         depth_dist_ft = max(abs(view_dir.DotProduct(vec_to_depth)), mm_to_ft(MIN_DEPTH_MM))
         
-        upper_level = get_upper_level(curr_level)
-        height_ft = (upper_level.Elevation - curr_level.Elevation) if upper_level else mm_to_ft(DEFAULT_HEIGHT_MM)
+        # LEVEL CALCULATIONS
+        lvl_below, lvl_above = get_adjacent_levels(curr_level)
+        
+        # Calculate vertical offsets relative to current level elevation
+        # Note: BoundingBoxXYZ Y-axis corresponds to the vertical 'Up' in a Section View's local coordinate system
+        bottom_offset = (lvl_below.Elevation - curr_level.Elevation) if lvl_below else -mm_to_ft(500)
+        top_offset = (lvl_above.Elevation - curr_level.Elevation) if lvl_above else mm_to_ft(DEFAULT_HEIGHT_MM)
 
         section_length_ft = vec_line.GetLength()
+        
+        
+        
         bbox = DB.BoundingBoxXYZ()
-        bbox.Min = DB.XYZ(-section_length_ft / 2.0, 0, 0)
-        bbox.Max = DB.XYZ(section_length_ft / 2.0, height_ft, depth_dist_ft)
+        bbox.Min = DB.XYZ(-section_length_ft / 2.0, bottom_offset, 0)
+        bbox.Max = DB.XYZ(section_length_ft / 2.0, top_offset, depth_dist_ft)
 
+        # Set transform origin to current level elevation to prevent "Sea Level" defaulting
         t = DB.Transform.Identity
-        t.Origin = midpoint
+        t.Origin = DB.XYZ(midpoint.X, midpoint.Y, curr_level.Elevation)
         t.BasisZ = view_dir
         t.BasisY = DB.XYZ.BasisZ
         t.BasisX = t.BasisY.CrossProduct(t.BasisZ)
