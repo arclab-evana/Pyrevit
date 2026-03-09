@@ -139,20 +139,20 @@ def create_3_click_section():
         # LEVEL CALCULATIONS
         lvl_below, lvl_above = get_adjacent_levels(curr_level)
         
-        # Calculate vertical offsets relative to current level elevation
-        # Note: BoundingBoxXYZ Y-axis corresponds to the vertical 'Up' in a Section View's local coordinate system
-        bottom_offset = (lvl_below.Elevation - curr_level.Elevation) if lvl_below else -mm_to_ft(500)
+        # --- FIXED ELEVATION LOGIC & VERTICAL AXIS MAPPING ---
+        # Bottom offset is strictly 0 relative to current level
+        bottom_offset = 0.0 
+        # Top offset goes exactly to the level above, or uses default if no level above exists
         top_offset = (lvl_above.Elevation - curr_level.Elevation) if lvl_above else mm_to_ft(DEFAULT_HEIGHT_MM)
 
         section_length_ft = vec_line.GetLength()
-        
-        
         
         bbox = DB.BoundingBoxXYZ()
         bbox.Min = DB.XYZ(-section_length_ft / 2.0, bottom_offset, 0)
         bbox.Max = DB.XYZ(section_length_ft / 2.0, top_offset, depth_dist_ft)
 
-        # Set transform origin to current level elevation to prevent "Sea Level" defaulting
+        # --- CORRECTED ORIGIN ALIGNMENT ---
+        # Set transform origin strictly to current level elevation
         t = DB.Transform.Identity
         t.Origin = DB.XYZ(midpoint.X, midpoint.Y, curr_level.Elevation)
         t.BasisZ = view_dir
